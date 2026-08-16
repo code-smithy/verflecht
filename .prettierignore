@@ -1,0 +1,10 @@
+node_modules/
+.next/
+coverage/
+dist/
+out/
+pnpm-lock.yaml
+
+# Preserve authored planning docs unless they are intentionally edited.
+docs/requirements.md
+docs/implementation-plan.md
