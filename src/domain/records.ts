@@ -79,6 +79,8 @@ export type ClaimRecord = {
   validFrom?: string;
   validTo?: string;
   confidenceScore?: number;
+  evidenceScore?: number;
+  validationNotes?: JsonRecord;
   verificationStatus: VerificationStatus;
   createdBy: string;
   reviewedBy?: string;
