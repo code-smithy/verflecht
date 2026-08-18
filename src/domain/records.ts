@@ -103,6 +103,26 @@ export type AuditLogRecord = {
   createdAt: Date;
 };
 
+export type LlmRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+
+export type LlmRunRecord = {
+  id: string;
+  documentId?: string;
+  claimId?: string;
+  operation: string;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  temperature: number;
+  inputHash: string;
+  output?: JsonRecord;
+  status: LlmRunStatus;
+  errorMessage?: string;
+  metadata: JsonRecord;
+  createdAt: Date;
+};
+
 export type EntityDraft = Omit<EntityRecord, "id" | "createdAt" | "updatedAt">;
 export type SourceDraft = Omit<SourceRecord, "id" | "createdAt" | "updatedAt">;
 export type DocumentDraft = Omit<DocumentRecord, "id" | "createdAt" | "updatedAt" | "retrievedAt"> &
@@ -110,3 +130,4 @@ export type DocumentDraft = Omit<DocumentRecord, "id" | "createdAt" | "updatedAt
 export type ClaimRecordDraft = Omit<ClaimRecord, "id" | "createdAt" | "updatedAt">;
 export type ClaimEvidenceDraft = Omit<ClaimEvidenceRecord, "id" | "createdAt" | "evidenceHash"> &
   Partial<Pick<ClaimEvidenceRecord, "evidenceHash">>;
+export type LlmRunDraft = Omit<LlmRunRecord, "id" | "createdAt">;

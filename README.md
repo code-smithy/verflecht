@@ -7,3 +7,4 @@ Planning documents:
 - [Database foundation](docs/database.md)
 - [Domain services](docs/domain-services.md)
 - [URL ingestion](docs/ingestion.md)
+- [LLM provider abstraction](docs/llm-provider.md)

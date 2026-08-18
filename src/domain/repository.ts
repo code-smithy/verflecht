@@ -4,6 +4,7 @@ import type {
   ClaimRecord,
   DocumentRecord,
   EntityRecord,
+  LlmRunRecord,
   SourceRecord,
 } from "./records";
 
@@ -55,6 +56,10 @@ export type ResearchRepository = {
 
   createAuditLog(record: AuditLogRecord): AuditLogRecord;
   listAuditLogs(): AuditLogRecord[];
+
+  createLlmRun(record: LlmRunRecord): LlmRunRecord;
+  getLlmRun(id: string): LlmRunRecord | undefined;
+  listLlmRuns(): LlmRunRecord[];
 };
 
 export class InMemoryResearchRepository implements ResearchRepository {
@@ -64,6 +69,7 @@ export class InMemoryResearchRepository implements ResearchRepository {
   private readonly claims = new Map<string, ClaimRecord>();
   private readonly claimEvidence = new Map<string, ClaimEvidenceRecord>();
   private readonly auditLogs = new Map<string, AuditLogRecord>();
+  private readonly llmRuns = new Map<string, LlmRunRecord>();
 
   createEntity(record: EntityRecord): EntityRecord {
     this.entities.set(record.id, cloneRecord(record));
@@ -154,5 +160,19 @@ export class InMemoryResearchRepository implements ResearchRepository {
 
   listAuditLogs(): AuditLogRecord[] {
     return Array.from(this.auditLogs.values(), cloneRecord);
+  }
+
+  createLlmRun(record: LlmRunRecord): LlmRunRecord {
+    this.llmRuns.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getLlmRun(id: string): LlmRunRecord | undefined {
+    const record = this.llmRuns.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  listLlmRuns(): LlmRunRecord[] {
+    return Array.from(this.llmRuns.values(), cloneRecord);
   }
 }
