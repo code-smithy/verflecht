@@ -16,6 +16,7 @@ import type {
   SourceDraft,
   SourceRecord,
 } from "./records";
+import type { ExtractionStatus } from "./ontology";
 
 export type ResearchDomainServiceOptions = {
   clock?: () => Date;
@@ -24,6 +25,18 @@ export type ResearchDomainServiceOptions = {
 
 export type EditorialActor = {
   actorId: string;
+};
+
+export type DocumentExtractionDraft = {
+  title?: string;
+  author?: string;
+  publisher?: string;
+  publishedAt?: Date;
+  description?: string;
+  language?: string;
+  extractedText?: string;
+  extractionStatus: ExtractionStatus;
+  metadata?: JsonRecord;
 };
 
 type ReviewerStatus = Extract<
@@ -109,6 +122,30 @@ export class ResearchDomainService {
       retrievedAt: draft.retrievedAt ?? now,
       createdAt: now,
       updatedAt: now,
+    });
+  }
+
+  updateDocumentExtraction(documentId: string, draft: DocumentExtractionDraft): DocumentRecord {
+    const document = this.repository.getDocument(documentId);
+
+    if (!document) {
+      throw new Error("Document does not exist.");
+    }
+
+    return this.repository.updateDocument(documentId, {
+      title: draft.title,
+      author: draft.author,
+      publisher: draft.publisher,
+      publishedAt: draft.publishedAt,
+      language: draft.language,
+      extractedText: draft.extractedText,
+      extractionStatus: draft.extractionStatus,
+      metadata: {
+        ...document.metadata,
+        ...(draft.description ? { extractedDescription: draft.description } : {}),
+        ...(draft.metadata ?? {}),
+      },
+      updatedAt: this.clock(),
     });
   }
 

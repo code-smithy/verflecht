@@ -40,6 +40,7 @@ export type ResearchRepository = {
 
   createDocument(record: DocumentRecord): DocumentRecord;
   getDocument(id: string): DocumentRecord | undefined;
+  updateDocument(id: string, changes: Partial<DocumentRecord>): DocumentRecord;
   listDocuments(): DocumentRecord[];
 
   createClaim(record: ClaimRecord): ClaimRecord;
@@ -100,6 +101,10 @@ export class InMemoryResearchRepository implements ResearchRepository {
   getDocument(id: string): DocumentRecord | undefined {
     const record = this.documents.get(id);
     return record ? cloneRecord(record) : undefined;
+  }
+
+  updateDocument(id: string, changes: Partial<DocumentRecord>): DocumentRecord {
+    return updateStoredRecord(this.documents, id, changes);
   }
 
   listDocuments(): DocumentRecord[] {
