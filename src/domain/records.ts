@@ -23,6 +23,17 @@ export type EntityRecord = {
   updatedAt: Date;
 };
 
+export type EntityAliasRecord = {
+  id: string;
+  entityId: string;
+  alias: string;
+  language?: string;
+  validFrom?: string;
+  validTo?: string;
+  sourceId?: string;
+  createdAt: Date;
+};
+
 export type SourceRecord = {
   id: string;
   name: string;
@@ -104,6 +115,7 @@ export type AuditLogRecord = {
 };
 
 export type LlmRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+export type EntityResolutionStatus = "AUTO_RESOLVED" | "MANUAL_REVIEW" | "NO_MATCH";
 
 export type LlmRunRecord = {
   id: string;
@@ -123,7 +135,31 @@ export type LlmRunRecord = {
   createdAt: Date;
 };
 
+export type EntityResolutionTaskRecord = {
+  id: string;
+  documentId?: string;
+  localId: string;
+  mentionText: string;
+  entityType: EntityType;
+  status: EntityResolutionStatus;
+  selectedEntityId?: string;
+  reason?: string;
+  payload: JsonRecord;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EntityResolutionCandidateRecord = {
+  id: string;
+  taskId: string;
+  candidateEntityId: string;
+  score: number;
+  signals: string[];
+  createdAt: Date;
+};
+
 export type EntityDraft = Omit<EntityRecord, "id" | "createdAt" | "updatedAt">;
+export type EntityAliasDraft = Omit<EntityAliasRecord, "id" | "createdAt">;
 export type SourceDraft = Omit<SourceRecord, "id" | "createdAt" | "updatedAt">;
 export type DocumentDraft = Omit<DocumentRecord, "id" | "createdAt" | "updatedAt" | "retrievedAt"> &
   Partial<Pick<DocumentRecord, "retrievedAt">>;
@@ -131,3 +167,11 @@ export type ClaimRecordDraft = Omit<ClaimRecord, "id" | "createdAt" | "updatedAt
 export type ClaimEvidenceDraft = Omit<ClaimEvidenceRecord, "id" | "createdAt" | "evidenceHash"> &
   Partial<Pick<ClaimEvidenceRecord, "evidenceHash">>;
 export type LlmRunDraft = Omit<LlmRunRecord, "id" | "createdAt">;
+export type EntityResolutionTaskDraft = Omit<
+  EntityResolutionTaskRecord,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type EntityResolutionCandidateDraft = Omit<
+  EntityResolutionCandidateRecord,
+  "id" | "createdAt"
+>;

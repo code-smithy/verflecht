@@ -10,6 +10,8 @@ import type {
   ClaimRecordDraft,
   DocumentDraft,
   DocumentRecord,
+  EntityAliasDraft,
+  EntityAliasRecord,
   EntityDraft,
   EntityRecord,
   JsonRecord,
@@ -93,6 +95,26 @@ export class ResearchDomainService {
       id: this.idFactory(),
       createdAt: now,
       updatedAt: now,
+    });
+  }
+
+  createEntityAlias(draft: EntityAliasDraft): EntityAliasRecord {
+    assertNonEmpty(draft.alias, "alias");
+    assertDateRange(draft.validFrom, draft.validTo);
+
+    if (!this.repository.getEntity(draft.entityId)) {
+      throw new Error("Cannot create an alias for an unknown entity.");
+    }
+
+    if (draft.sourceId && !this.repository.getSource(draft.sourceId)) {
+      throw new Error("Cannot create an alias from an unknown source.");
+    }
+
+    return this.repository.createEntityAlias({
+      ...draft,
+      alias: draft.alias.trim(),
+      id: this.idFactory(),
+      createdAt: this.clock(),
     });
   }
 

@@ -3,6 +3,9 @@ import type {
   ClaimEvidenceRecord,
   ClaimRecord,
   DocumentRecord,
+  EntityAliasRecord,
+  EntityResolutionCandidateRecord,
+  EntityResolutionTaskRecord,
   EntityRecord,
   LlmRunRecord,
   SourceRecord,
@@ -35,6 +38,11 @@ export type ResearchRepository = {
   getEntity(id: string): EntityRecord | undefined;
   listEntities(): EntityRecord[];
 
+  createEntityAlias(record: EntityAliasRecord): EntityAliasRecord;
+  getEntityAlias(id: string): EntityAliasRecord | undefined;
+  listEntityAliases(): EntityAliasRecord[];
+  listEntityAliasesByEntityId(entityId: string): EntityAliasRecord[];
+
   createSource(record: SourceRecord): SourceRecord;
   getSource(id: string): SourceRecord | undefined;
   listSources(): SourceRecord[];
@@ -60,16 +68,28 @@ export type ResearchRepository = {
   createLlmRun(record: LlmRunRecord): LlmRunRecord;
   getLlmRun(id: string): LlmRunRecord | undefined;
   listLlmRuns(): LlmRunRecord[];
+
+  createEntityResolutionTask(record: EntityResolutionTaskRecord): EntityResolutionTaskRecord;
+  getEntityResolutionTask(id: string): EntityResolutionTaskRecord | undefined;
+  listEntityResolutionTasks(): EntityResolutionTaskRecord[];
+
+  createEntityResolutionCandidate(
+    record: EntityResolutionCandidateRecord,
+  ): EntityResolutionCandidateRecord;
+  listEntityResolutionCandidatesByTaskId(taskId: string): EntityResolutionCandidateRecord[];
 };
 
 export class InMemoryResearchRepository implements ResearchRepository {
   private readonly entities = new Map<string, EntityRecord>();
+  private readonly entityAliases = new Map<string, EntityAliasRecord>();
   private readonly sources = new Map<string, SourceRecord>();
   private readonly documents = new Map<string, DocumentRecord>();
   private readonly claims = new Map<string, ClaimRecord>();
   private readonly claimEvidence = new Map<string, ClaimEvidenceRecord>();
   private readonly auditLogs = new Map<string, AuditLogRecord>();
   private readonly llmRuns = new Map<string, LlmRunRecord>();
+  private readonly entityResolutionTasks = new Map<string, EntityResolutionTaskRecord>();
+  private readonly entityResolutionCandidates = new Map<string, EntityResolutionCandidateRecord>();
 
   createEntity(record: EntityRecord): EntityRecord {
     this.entities.set(record.id, cloneRecord(record));
@@ -83,6 +103,24 @@ export class InMemoryResearchRepository implements ResearchRepository {
 
   listEntities(): EntityRecord[] {
     return Array.from(this.entities.values(), cloneRecord);
+  }
+
+  createEntityAlias(record: EntityAliasRecord): EntityAliasRecord {
+    this.entityAliases.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getEntityAlias(id: string): EntityAliasRecord | undefined {
+    const record = this.entityAliases.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  listEntityAliases(): EntityAliasRecord[] {
+    return Array.from(this.entityAliases.values(), cloneRecord);
+  }
+
+  listEntityAliasesByEntityId(entityId: string): EntityAliasRecord[] {
+    return this.listEntityAliases().filter((alias) => alias.entityId === entityId);
   }
 
   createSource(record: SourceRecord): SourceRecord {
@@ -174,5 +212,32 @@ export class InMemoryResearchRepository implements ResearchRepository {
 
   listLlmRuns(): LlmRunRecord[] {
     return Array.from(this.llmRuns.values(), cloneRecord);
+  }
+
+  createEntityResolutionTask(record: EntityResolutionTaskRecord): EntityResolutionTaskRecord {
+    this.entityResolutionTasks.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getEntityResolutionTask(id: string): EntityResolutionTaskRecord | undefined {
+    const record = this.entityResolutionTasks.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  listEntityResolutionTasks(): EntityResolutionTaskRecord[] {
+    return Array.from(this.entityResolutionTasks.values(), cloneRecord);
+  }
+
+  createEntityResolutionCandidate(
+    record: EntityResolutionCandidateRecord,
+  ): EntityResolutionCandidateRecord {
+    this.entityResolutionCandidates.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  listEntityResolutionCandidatesByTaskId(taskId: string): EntityResolutionCandidateRecord[] {
+    return Array.from(this.entityResolutionCandidates.values(), cloneRecord).filter(
+      (candidate) => candidate.taskId === taskId,
+    );
   }
 }
