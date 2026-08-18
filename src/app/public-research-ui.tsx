@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, type PointerEvent } from "react";
+import React, { useEffect, useMemo, useState, type PointerEvent } from "react";
 
 import { connectionClasses, entityTypes, relationPredicates } from "@/domain/ontology";
 import type {
@@ -76,7 +76,9 @@ export function PublicResearchUi({
   graph: PublicGraphProjection;
   unavailableReason?: string;
 }) {
-  const viewModel = useMemo(() => buildPublicResearchViewModel(graph), [graph]);
+  const [publicGraph, setPublicGraph] = useState(graph);
+  const [dataWarning, setDataWarning] = useState(unavailableReason);
+  const viewModel = useMemo(() => buildPublicResearchViewModel(publicGraph), [publicGraph]);
   const [filters, setFilters] = useState<ResearchFilters>(initialFilters);
   const [activeTab, setActiveTab] = useState<ResearchTab>("network");
   const [selectedNodeId, setSelectedNodeId] = useState(viewModel.nodes[0]?.id ?? "");
@@ -115,6 +117,39 @@ export function PublicResearchUi({
   const neighborIds = selectedDetailNode
     ? getNeighborIds(filtered.edges, selectedDetailNode.id)
     : new Set<string>();
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadGraph() {
+      try {
+        const response = await fetch("api/graph", { headers: { accept: "application/json" } });
+
+        if (!response.ok) {
+          throw new Error(`Public graph API returned ${response.status}.`);
+        }
+
+        const nextGraph = (await response.json()) as PublicGraphProjection;
+
+        if (active) {
+          setPublicGraph(nextGraph);
+          setDataWarning(undefined);
+        }
+      } catch (error) {
+        if (active) {
+          setDataWarning(
+            error instanceof Error ? error.message : "Public graph data could not be loaded.",
+          );
+        }
+      }
+    }
+
+    void loadGraph();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function updateFilter<K extends keyof ResearchFilters>(key: K, value: ResearchFilters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -208,7 +243,7 @@ export function PublicResearchUi({
           <span>Historical</span>
         </label>
 
-        {unavailableReason ? <p className="data-warning">{unavailableReason}</p> : null}
+        {dataWarning ? <p className="data-warning">{dataWarning}</p> : null}
       </aside>
 
       <section className="research-workspace">

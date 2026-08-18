@@ -33,8 +33,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Exclude server-only API routes
+        run: |
+          mkdir -p "$RUNNER_TEMP/verflecht-server-routes"
+          mv src/app/api "$RUNNER_TEMP/verflecht-server-routes/api"
+
       - name: Build static site
         run: pnpm build
+        env:
+          NEXT_OUTPUT: export
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
