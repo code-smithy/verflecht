@@ -118,6 +118,19 @@ export type AuditLogRecord = {
 
 export type LlmRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
 export type EntityResolutionStatus = "AUTO_RESOLVED" | "MANUAL_REVIEW" | "NO_MATCH";
+export type ReviewQueueStatus = "OPEN" | "ASSIGNED" | "RESOLVED" | "CANCELLED";
+
+export type ReviewQueueRecord = {
+  id: string;
+  claimId: string;
+  status: ReviewQueueStatus;
+  assignedTo?: string;
+  reason?: string;
+  reviewerNotes?: string;
+  payload: JsonRecord;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export type LlmRunRecord = {
   id: string;

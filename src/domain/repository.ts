@@ -8,6 +8,7 @@ import type {
   EntityResolutionTaskRecord,
   EntityRecord,
   LlmRunRecord,
+  ReviewQueueRecord,
   SourceRecord,
 } from "./records";
 
@@ -36,6 +37,7 @@ function updateStoredRecord<T extends StoredRecord>(
 export type ResearchRepository = {
   createEntity(record: EntityRecord): EntityRecord;
   getEntity(id: string): EntityRecord | undefined;
+  updateEntity(id: string, changes: Partial<EntityRecord>): EntityRecord;
   listEntities(): EntityRecord[];
 
   createEntityAlias(record: EntityAliasRecord): EntityAliasRecord;
@@ -65,6 +67,12 @@ export type ResearchRepository = {
   createAuditLog(record: AuditLogRecord): AuditLogRecord;
   listAuditLogs(): AuditLogRecord[];
 
+  createReviewQueueItem(record: ReviewQueueRecord): ReviewQueueRecord;
+  getReviewQueueItem(id: string): ReviewQueueRecord | undefined;
+  updateReviewQueueItem(id: string, changes: Partial<ReviewQueueRecord>): ReviewQueueRecord;
+  listReviewQueueItems(): ReviewQueueRecord[];
+  listReviewQueueItemsByClaimId(claimId: string): ReviewQueueRecord[];
+
   createLlmRun(record: LlmRunRecord): LlmRunRecord;
   getLlmRun(id: string): LlmRunRecord | undefined;
   listLlmRuns(): LlmRunRecord[];
@@ -87,6 +95,7 @@ export class InMemoryResearchRepository implements ResearchRepository {
   private readonly claims = new Map<string, ClaimRecord>();
   private readonly claimEvidence = new Map<string, ClaimEvidenceRecord>();
   private readonly auditLogs = new Map<string, AuditLogRecord>();
+  private readonly reviewQueueItems = new Map<string, ReviewQueueRecord>();
   private readonly llmRuns = new Map<string, LlmRunRecord>();
   private readonly entityResolutionTasks = new Map<string, EntityResolutionTaskRecord>();
   private readonly entityResolutionCandidates = new Map<string, EntityResolutionCandidateRecord>();
@@ -99,6 +108,10 @@ export class InMemoryResearchRepository implements ResearchRepository {
   getEntity(id: string): EntityRecord | undefined {
     const record = this.entities.get(id);
     return record ? cloneRecord(record) : undefined;
+  }
+
+  updateEntity(id: string, changes: Partial<EntityRecord>): EntityRecord {
+    return updateStoredRecord(this.entities, id, changes);
   }
 
   listEntities(): EntityRecord[] {
@@ -198,6 +211,28 @@ export class InMemoryResearchRepository implements ResearchRepository {
 
   listAuditLogs(): AuditLogRecord[] {
     return Array.from(this.auditLogs.values(), cloneRecord);
+  }
+
+  createReviewQueueItem(record: ReviewQueueRecord): ReviewQueueRecord {
+    this.reviewQueueItems.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getReviewQueueItem(id: string): ReviewQueueRecord | undefined {
+    const record = this.reviewQueueItems.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  updateReviewQueueItem(id: string, changes: Partial<ReviewQueueRecord>): ReviewQueueRecord {
+    return updateStoredRecord(this.reviewQueueItems, id, changes);
+  }
+
+  listReviewQueueItems(): ReviewQueueRecord[] {
+    return Array.from(this.reviewQueueItems.values(), cloneRecord);
+  }
+
+  listReviewQueueItemsByClaimId(claimId: string): ReviewQueueRecord[] {
+    return this.listReviewQueueItems().filter((item) => item.claimId === claimId);
   }
 
   createLlmRun(record: LlmRunRecord): LlmRunRecord {
