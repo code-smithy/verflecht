@@ -8,3 +8,4 @@ Planning documents:
 - [Domain services](docs/domain-services.md)
 - [URL ingestion](docs/ingestion.md)
 - [LLM provider abstraction](docs/llm-provider.md)
+- [Public API](docs/public-api.md)

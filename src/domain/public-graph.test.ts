@@ -53,7 +53,14 @@ function createGraphContext() {
     metadata: { internalExtractorVersion: "hidden" },
   });
 
-  return { repository, service, graph, person, party, event, document };
+  service.createEntityAlias({
+    entityId: person.id,
+    alias: "J. Example",
+    language: "en",
+    sourceId: source.id,
+  });
+
+  return { repository, service, graph, person, party, event, source, document };
 }
 
 function createReviewedClaim(
@@ -63,6 +70,9 @@ function createReviewedClaim(
     objectEntityId?: string;
     connectionClass?: "DIRECT" | "HISTORICAL" | "OFFICIAL";
     status?: "VERIFIED" | "REJECTED" | "DISPUTED";
+    validFrom?: string;
+    validTo?: string;
+    topics?: string[];
   } = {},
 ) {
   const predicate = options.predicate ?? "MEMBER_OF";
@@ -72,6 +82,9 @@ function createReviewedClaim(
     predicate,
     objectEntityId,
     connectionClass: options.connectionClass ?? "DIRECT",
+    validFrom: options.validFrom,
+    validTo: options.validTo,
+    validationNotes: options.topics ? { topics: options.topics } : {},
     verificationStatus: "PENDING_REVIEW",
     createdBy: "system",
   });
@@ -137,6 +150,8 @@ describe("public graph projection", () => {
     expect(edge.evidence[0].document).not.toHaveProperty("rawStoragePath");
     expect(edge.evidence[0].document).not.toHaveProperty("extractedText");
     expect(edge.evidence[0].source).not.toHaveProperty("metadata");
+    expect(projection).not.toHaveProperty("auditLogs");
+    expect(projection).not.toHaveProperty("reviewQueue");
   });
 
   it("excludes pending, rejected, disputed, and evidence-free claims", () => {
@@ -177,5 +192,88 @@ describe("public graph projection", () => {
     expect(context.graph.getPublicGraph({ entityType: "POLITICAL_PARTY" }).edges).toHaveLength(2);
     expect(context.graph.getPublicGraph({ connectionClass: "OFFICIAL" }).edges).toHaveLength(1);
     expect(context.graph.getPublicGraph({ includeHistorical: false }).edges).toHaveLength(2);
+  });
+
+  it("supports topic, person, organization, and date range filters", () => {
+    const context = createGraphContext();
+    createReviewedClaim(context, {
+      topics: ["ENERGY"],
+      validFrom: "2024-01-01",
+      validTo: "2024-12-31",
+    });
+    createReviewedClaim(context, {
+      predicate: "PRESIDENT_OF",
+      topics: ["SECURITY"],
+      validFrom: "2021-01-01",
+      validTo: "2021-12-31",
+    });
+
+    expect(context.graph.getPublicGraph({ topic: "ENERGY" }).edges).toHaveLength(1);
+    expect(context.graph.getPublicGraph({ person: "jane-example" }).edges).toHaveLength(2);
+    expect(context.graph.getPublicGraph({ organization: "Example Party" }).edges).toHaveLength(2);
+    expect(
+      context.graph.getPublicGraph({ dateFrom: "2024-06-01", dateTo: "2024-06-30" }).edges,
+    ).toEqual([expect.objectContaining({ predicate: "MEMBER_OF" })]);
+  });
+
+  it("projects public entity detail with aliases, connected entities, sources, events, and timeline", () => {
+    const context = createGraphContext();
+    const direct = createReviewedClaim(context, {
+      validFrom: "2024-01-01",
+    });
+    createReviewedClaim(context, {
+      predicate: "SPOKE_AT",
+      objectEntityId: context.event.id,
+      connectionClass: "OFFICIAL",
+      validFrom: "2026-02-15",
+      validTo: "2026-02-15",
+    });
+
+    const detail = context.graph.getPublicEntityDetail(context.person.id);
+
+    expect(detail).toMatchObject({
+      entity: {
+        id: context.person.id,
+        canonicalName: "Jane Example",
+      },
+      aliases: [{ alias: "J. Example", language: "en" }],
+      claims: [expect.objectContaining({ id: direct.id }), expect.any(Object)],
+      connectedEntities: [
+        expect.objectContaining({ canonicalName: "Example Hearing" }),
+        expect.objectContaining({ canonicalName: "Example Party" }),
+      ],
+      events: [expect.objectContaining({ canonicalName: "Example Hearing" })],
+      sources: [expect.objectContaining({ name: "Parliament Register" })],
+      timeline: [
+        expect.objectContaining({
+          predicate: "MEMBER_OF",
+          connectedEntity: expect.objectContaining({ canonicalName: "Example Party" }),
+        }),
+        expect.objectContaining({
+          predicate: "SPOKE_AT",
+          connectedEntity: expect.objectContaining({ canonicalName: "Example Hearing" }),
+        }),
+      ],
+    });
+    expect(detail?.entity).not.toHaveProperty("metadata");
+    expect(detail?.claims[0]).not.toHaveProperty("reviewedBy");
+  });
+
+  it("projects public claim detail only for verified source-backed claims", () => {
+    const context = createGraphContext();
+    const verified = createReviewedClaim(context);
+    const rejected = createReviewedClaim(context, {
+      predicate: "PRESIDENT_OF",
+      status: "REJECTED",
+    });
+
+    expect(context.graph.getPublicClaimDetail(verified.id)).toMatchObject({
+      id: verified.id,
+      verificationStatus: "VERIFIED",
+      subject: { canonicalName: "Jane Example" },
+      object: { canonicalName: "Example Party" },
+      evidence: [expect.objectContaining({ evidenceText: "Jane Example member_of evidence." })],
+    });
+    expect(context.graph.getPublicClaimDetail(rejected.id)).toBeUndefined();
   });
 });

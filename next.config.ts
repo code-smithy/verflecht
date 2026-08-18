@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  output: "export",
   reactStrictMode: true,
   trailingSlash: true,
 };

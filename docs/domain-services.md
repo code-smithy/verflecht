@@ -36,7 +36,11 @@ The service exposes review actions for verify, reject, mark disputed, edit verif
 
 ## Public Graph Rules
 
-`PublicGraphService.getPublicGraph` returns only verified claims that have source-backed evidence. It excludes:
+`PublicGraphService.getPublicGraph` returns only verified claims that have source-backed evidence. It supports public filters for entity id, entity type, predicate, connection class, topic, person, organization, validity date range, and historical inclusion.
+
+The same service also projects public entity and claim detail responses for Phase 9 API routes. Entity detail includes safe aliases, verified claims, connected entities, events, sources, and a timeline. Claim detail includes subject, relation, object, classification, validity, `VERIFIED` status, evidence, and source metadata.
+
+It excludes:
 
 - `DETECTED`
 - `PENDING_REVIEW`
@@ -45,6 +49,6 @@ The service exposes review actions for verify, reject, mark disputed, edit verif
 - `OUTDATED`
 - claims without evidence
 - claims whose evidence cannot be traced to a document and source
-- raw document text, storage paths, source metadata, audit fields, reviewer fields, and creator fields
+- raw document text, storage paths, source metadata, audit fields, reviewer fields, creator fields, review queue fields, and LLM prompt internals
 
-Supported filters are entity id, entity type, predicate, connection class, and historical inclusion.
+Public route behavior is documented in [Public API](public-api.md).
