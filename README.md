@@ -6,3 +6,4 @@ Planning documents:
 - [Implementation plan](docs/implementation-plan.md)
 - [Database foundation](docs/database.md)
 - [Domain services](docs/domain-services.md)
+- [URL ingestion](docs/ingestion.md)
