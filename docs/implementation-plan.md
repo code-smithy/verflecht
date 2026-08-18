@@ -386,6 +386,10 @@ Exit criteria:
 - No edge is displayed without source and evidence details.
 - Historical relationships are visually distinct from current relationships.
 
+Implemented UI notes:
+
+- See `docs/public-ui.md` for the root public interface and its display guards.
+
 ### Phase 11 - RSS and Sitemap Discovery
 
 Goal: expand ingestion beyond manual URLs.
