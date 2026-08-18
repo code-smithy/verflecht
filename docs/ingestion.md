@@ -1,6 +1,7 @@
 # URL Ingestion
 
 Phase 3 introduces manual URL ingestion under `src/ingestion`.
+Phase 11 adds feed and sitemap discovery under `src/ingestion/discovery.ts`.
 
 ## Boundaries
 
@@ -9,6 +10,7 @@ Phase 3 introduces manual URL ingestion under `src/ingestion`.
 - `hash.ts` computes SHA-256 hashes for fetched raw content.
 - `storage.ts` defines the raw-document storage boundary. `SupabaseRawDocumentStorage` writes to Supabase Storage and `InMemoryRawDocumentStorage` is used for deterministic unit tests.
 - `url-ingestion.ts` coordinates fetch, hash, raw-content storage, and immutable document-record creation through the existing domain service.
+- `discovery.ts` parses RSS, Atom, sitemap, and news sitemap documents, then stores discovered URLs as deduplicated URL candidates before document fetching.
 
 ## Deduplication and Versioning
 
@@ -47,3 +49,11 @@ Phase 3 tests cover:
 - SHA-256 hashing and raw storage paths
 - idempotent repeated import
 - changed-content document versioning
+
+Phase 11 tests cover:
+
+- RSS parsing
+- sitemap and news sitemap parsing
+- URL candidate canonicalization and deduplication
+- crawl run statistics
+- failed sitemap child isolation

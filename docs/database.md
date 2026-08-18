@@ -6,6 +6,8 @@ Phase 6 adds entity-resolution review persistence in
 `supabase/migrations/202608180003_phase_6_entity_resolution.sql`.
 Phase 7 adds deterministic evidence-scoring metadata in
 `supabase/migrations/202608180004_phase_7_claim_validation.sql`.
+Phase 11 adds URL discovery candidates in
+`supabase/migrations/202608180005_phase_11_url_discovery.sql`.
 
 ## Scope
 
@@ -15,6 +17,7 @@ The migration creates:
 - core tables for sources, entities, aliases, documents, claims, claim evidence, review queue, audit log, LLM runs, and crawl runs
 - entity-resolution tasks and candidate rows for ambiguous or low-confidence matches
 - deterministic claim evidence score and compact validation notes
+- URL candidates for RSS, sitemap, news sitemap, and manual discovery
 - indexes for graph, document, review, and audit queries
 - a deferrable database trigger that prevents `VERIFIED` claims without at least one evidence record
 - Row Level Security policies that keep internal data private and expose only verified, source-backed claim data through direct public reads
@@ -51,6 +54,8 @@ The public policies do not expose `documents`, `sources`, `review_queue`, `audit
 The public policies also do not expose `entity_resolution_tasks` or
 `entity_resolution_candidates`; these contain unresolved research context and
 are internal review data.
+The public policies also do not expose `url_candidates`; discovered URLs are
+internal queue data until they become reviewed, source-backed public claims.
 
 ## Local Secrets
 

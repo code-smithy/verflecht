@@ -119,6 +119,9 @@ export type AuditLogRecord = {
 export type LlmRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
 export type EntityResolutionStatus = "AUTO_RESOLVED" | "MANUAL_REVIEW" | "NO_MATCH";
 export type ReviewQueueStatus = "OPEN" | "ASSIGNED" | "RESOLVED" | "CANCELLED";
+export type CrawlRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "PARTIAL";
+export type UrlCandidateStatus = "PENDING" | "FETCHED" | "SKIPPED" | "FAILED";
+export type UrlDiscoveryType = "RSS" | "SITEMAP" | "NEWS_SITEMAP" | "MANUAL";
 
 export type ReviewQueueRecord = {
   id: string;
@@ -148,6 +151,37 @@ export type LlmRunRecord = {
   errorMessage?: string;
   metadata: JsonRecord;
   createdAt: Date;
+};
+
+export type CrawlRunRecord = {
+  id: string;
+  sourceId: string;
+  startedAt: Date;
+  finishedAt?: Date;
+  status: CrawlRunStatus;
+  urlsDiscovered: number;
+  documentsFetched: number;
+  documentsChanged: number;
+  documentsFailed: number;
+  errorLog: JsonRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UrlCandidateRecord = {
+  id: string;
+  sourceId: string;
+  crawlRunId?: string;
+  discoveryType: UrlDiscoveryType;
+  originalUrl: string;
+  canonicalUrl: string;
+  title?: string;
+  publishedAt?: Date;
+  lastModifiedAt?: Date;
+  status: UrlCandidateStatus;
+  metadata: JsonRecord;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type EntityResolutionTaskRecord = {
@@ -182,6 +216,8 @@ export type ClaimRecordDraft = Omit<ClaimRecord, "id" | "createdAt" | "updatedAt
 export type ClaimEvidenceDraft = Omit<ClaimEvidenceRecord, "id" | "createdAt" | "evidenceHash"> &
   Partial<Pick<ClaimEvidenceRecord, "evidenceHash">>;
 export type LlmRunDraft = Omit<LlmRunRecord, "id" | "createdAt">;
+export type CrawlRunDraft = Omit<CrawlRunRecord, "id" | "createdAt" | "updatedAt">;
+export type UrlCandidateDraft = Omit<UrlCandidateRecord, "id" | "createdAt" | "updatedAt">;
 export type EntityResolutionTaskDraft = Omit<
   EntityResolutionTaskRecord,
   "id" | "createdAt" | "updatedAt"

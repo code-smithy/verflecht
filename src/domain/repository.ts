@@ -2,6 +2,7 @@ import type {
   AuditLogRecord,
   ClaimEvidenceRecord,
   ClaimRecord,
+  CrawlRunRecord,
   DocumentRecord,
   EntityAliasRecord,
   EntityResolutionCandidateRecord,
@@ -10,6 +11,7 @@ import type {
   LlmRunRecord,
   ReviewQueueRecord,
   SourceRecord,
+  UrlCandidateRecord,
 } from "./records";
 
 type StoredRecord = { id: string };
@@ -77,6 +79,20 @@ export type ResearchRepository = {
   getLlmRun(id: string): LlmRunRecord | undefined;
   listLlmRuns(): LlmRunRecord[];
 
+  createCrawlRun(record: CrawlRunRecord): CrawlRunRecord;
+  getCrawlRun(id: string): CrawlRunRecord | undefined;
+  updateCrawlRun(id: string, changes: Partial<CrawlRunRecord>): CrawlRunRecord;
+  listCrawlRuns(): CrawlRunRecord[];
+
+  createUrlCandidate(record: UrlCandidateRecord): UrlCandidateRecord;
+  getUrlCandidate(id: string): UrlCandidateRecord | undefined;
+  updateUrlCandidate(id: string, changes: Partial<UrlCandidateRecord>): UrlCandidateRecord;
+  listUrlCandidates(): UrlCandidateRecord[];
+  getUrlCandidateByCanonicalUrl(
+    sourceId: string,
+    canonicalUrl: string,
+  ): UrlCandidateRecord | undefined;
+
   createEntityResolutionTask(record: EntityResolutionTaskRecord): EntityResolutionTaskRecord;
   getEntityResolutionTask(id: string): EntityResolutionTaskRecord | undefined;
   listEntityResolutionTasks(): EntityResolutionTaskRecord[];
@@ -97,6 +113,8 @@ export class InMemoryResearchRepository implements ResearchRepository {
   private readonly auditLogs = new Map<string, AuditLogRecord>();
   private readonly reviewQueueItems = new Map<string, ReviewQueueRecord>();
   private readonly llmRuns = new Map<string, LlmRunRecord>();
+  private readonly crawlRuns = new Map<string, CrawlRunRecord>();
+  private readonly urlCandidates = new Map<string, UrlCandidateRecord>();
   private readonly entityResolutionTasks = new Map<string, EntityResolutionTaskRecord>();
   private readonly entityResolutionCandidates = new Map<string, EntityResolutionCandidateRecord>();
 
@@ -247,6 +265,51 @@ export class InMemoryResearchRepository implements ResearchRepository {
 
   listLlmRuns(): LlmRunRecord[] {
     return Array.from(this.llmRuns.values(), cloneRecord);
+  }
+
+  createCrawlRun(record: CrawlRunRecord): CrawlRunRecord {
+    this.crawlRuns.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getCrawlRun(id: string): CrawlRunRecord | undefined {
+    const record = this.crawlRuns.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  updateCrawlRun(id: string, changes: Partial<CrawlRunRecord>): CrawlRunRecord {
+    return updateStoredRecord(this.crawlRuns, id, changes);
+  }
+
+  listCrawlRuns(): CrawlRunRecord[] {
+    return Array.from(this.crawlRuns.values(), cloneRecord);
+  }
+
+  createUrlCandidate(record: UrlCandidateRecord): UrlCandidateRecord {
+    this.urlCandidates.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getUrlCandidate(id: string): UrlCandidateRecord | undefined {
+    const record = this.urlCandidates.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  updateUrlCandidate(id: string, changes: Partial<UrlCandidateRecord>): UrlCandidateRecord {
+    return updateStoredRecord(this.urlCandidates, id, changes);
+  }
+
+  listUrlCandidates(): UrlCandidateRecord[] {
+    return Array.from(this.urlCandidates.values(), cloneRecord);
+  }
+
+  getUrlCandidateByCanonicalUrl(
+    sourceId: string,
+    canonicalUrl: string,
+  ): UrlCandidateRecord | undefined {
+    return this.listUrlCandidates().find(
+      (candidate) => candidate.sourceId === sourceId && candidate.canonicalUrl === canonicalUrl,
+    );
   }
 
   createEntityResolutionTask(record: EntityResolutionTaskRecord): EntityResolutionTaskRecord {

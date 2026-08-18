@@ -414,6 +414,10 @@ Exit criteria:
 
 - Failed discovery or fetch items do not block the rest of a crawl run.
 
+Implemented discovery notes:
+
+- See `docs/discovery.md` for feed/sitemap parsing, URL candidate persistence, and crawl-run stats.
+
 ### Phase 12 - Scheduling and Change Detection
 
 Goal: make ingestion repeatable and auditable.

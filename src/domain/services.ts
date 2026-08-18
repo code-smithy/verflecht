@@ -8,6 +8,8 @@ import type {
   ClaimEvidenceRecord,
   ClaimRecord,
   ClaimRecordDraft,
+  CrawlRunDraft,
+  CrawlRunRecord,
   DocumentDraft,
   DocumentRecord,
   EntityAliasDraft,
@@ -17,6 +19,8 @@ import type {
   JsonRecord,
   SourceDraft,
   SourceRecord,
+  UrlCandidateDraft,
+  UrlCandidateRecord,
 } from "./records";
 import type { ExtractionStatus } from "./ontology";
 
@@ -142,6 +146,84 @@ export class ResearchDomainService {
       ...draft,
       id: this.idFactory(),
       retrievedAt: draft.retrievedAt ?? now,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  createCrawlRun(draft: CrawlRunDraft): CrawlRunRecord {
+    if (!this.repository.getSource(draft.sourceId)) {
+      throw new Error("Cannot create a crawl run for an unknown source.");
+    }
+
+    if (draft.finishedAt && draft.finishedAt < draft.startedAt) {
+      throw new Error("crawl run finishedAt must be after startedAt.");
+    }
+
+    const now = this.clock();
+    return this.repository.createCrawlRun({
+      ...draft,
+      id: this.idFactory(),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  updateCrawlRun(crawlRunId: string, changes: Partial<CrawlRunRecord>): CrawlRunRecord {
+    const current = this.repository.getCrawlRun(crawlRunId);
+
+    if (!current) {
+      throw new Error("Crawl run does not exist.");
+    }
+
+    if (changes.finishedAt && (changes.startedAt ?? current.startedAt) > changes.finishedAt) {
+      throw new Error("crawl run finishedAt must be after startedAt.");
+    }
+
+    return this.repository.updateCrawlRun(crawlRunId, {
+      ...changes,
+      updatedAt: this.clock(),
+    });
+  }
+
+  createOrUpdateUrlCandidate(draft: UrlCandidateDraft): UrlCandidateRecord {
+    assertNonEmpty(draft.originalUrl, "originalUrl");
+    assertNonEmpty(draft.canonicalUrl, "canonicalUrl");
+
+    if (!this.repository.getSource(draft.sourceId)) {
+      throw new Error("Cannot create a URL candidate for an unknown source.");
+    }
+
+    if (draft.crawlRunId && !this.repository.getCrawlRun(draft.crawlRunId)) {
+      throw new Error("Cannot create a URL candidate for an unknown crawl run.");
+    }
+
+    const existing = this.repository.getUrlCandidateByCanonicalUrl(
+      draft.sourceId,
+      draft.canonicalUrl,
+    );
+    const now = this.clock();
+
+    if (existing) {
+      return this.repository.updateUrlCandidate(existing.id, {
+        ...draft,
+        id: existing.id,
+        createdAt: existing.createdAt,
+        updatedAt: now,
+        metadata: {
+          ...existing.metadata,
+          ...draft.metadata,
+          discoveryCount:
+            typeof existing.metadata.discoveryCount === "number"
+              ? existing.metadata.discoveryCount + 1
+              : 2,
+        },
+      });
+    }
+
+    return this.repository.createUrlCandidate({
+      ...draft,
+      id: this.idFactory(),
       createdAt: now,
       updatedAt: now,
     });
