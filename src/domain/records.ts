@@ -122,6 +122,11 @@ export type ReviewQueueStatus = "OPEN" | "ASSIGNED" | "RESOLVED" | "CANCELLED";
 export type CrawlRunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "PARTIAL";
 export type UrlCandidateStatus = "PENDING" | "FETCHED" | "SKIPPED" | "FAILED";
 export type UrlDiscoveryType = "RSS" | "SITEMAP" | "NEWS_SITEMAP" | "MANUAL";
+export type CrawlScheduleFrequency = "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY";
+export type CrawlScheduleStatus = "ACTIVE" | "PAUSED";
+export type IngestionJobKind =
+  "DISCOVER_URLS" | "FETCH_URL" | "EXTRACT_DOCUMENT" | "ANALYZE_DOCUMENT";
+export type IngestionJobStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "SKIPPED";
 
 export type ReviewQueueRecord = {
   id: string;
@@ -184,6 +189,38 @@ export type UrlCandidateRecord = {
   updatedAt: Date;
 };
 
+export type CrawlScheduleRecord = {
+  id: string;
+  sourceId: string;
+  frequency: CrawlScheduleFrequency;
+  discoveryUrls: string[];
+  nextRunAt: Date;
+  lastRunAt?: Date;
+  status: CrawlScheduleStatus;
+  metadata: JsonRecord;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type IngestionJobRecord = {
+  id: string;
+  sourceId: string;
+  crawlRunId?: string;
+  urlCandidateId?: string;
+  documentId?: string;
+  jobKind: IngestionJobKind;
+  status: IngestionJobStatus;
+  attempts: number;
+  maxAttempts: number;
+  scheduledAt: Date;
+  lockedAt?: Date;
+  finishedAt?: Date;
+  errorMessage?: string;
+  metadata: JsonRecord;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type EntityResolutionTaskRecord = {
   id: string;
   documentId?: string;
@@ -218,6 +255,8 @@ export type ClaimEvidenceDraft = Omit<ClaimEvidenceRecord, "id" | "createdAt" | 
 export type LlmRunDraft = Omit<LlmRunRecord, "id" | "createdAt">;
 export type CrawlRunDraft = Omit<CrawlRunRecord, "id" | "createdAt" | "updatedAt">;
 export type UrlCandidateDraft = Omit<UrlCandidateRecord, "id" | "createdAt" | "updatedAt">;
+export type CrawlScheduleDraft = Omit<CrawlScheduleRecord, "id" | "createdAt" | "updatedAt">;
+export type IngestionJobDraft = Omit<IngestionJobRecord, "id" | "createdAt" | "updatedAt">;
 export type EntityResolutionTaskDraft = Omit<
   EntityResolutionTaskRecord,
   "id" | "createdAt" | "updatedAt"

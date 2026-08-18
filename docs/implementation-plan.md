@@ -442,6 +442,10 @@ Exit criteria:
 
 - Crawl and analysis jobs can be rerun safely without producing duplicate facts.
 
+Implemented scheduling notes:
+
+- See `docs/scheduling.md` for crawl schedules, retryable ingestion jobs, unchanged-content skips, and changed-version downstream job creation.
+
 ## First Implementation Slice
 
 The first code-producing slice should be deliberately small:

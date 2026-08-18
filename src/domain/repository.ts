@@ -3,6 +3,7 @@ import type {
   ClaimEvidenceRecord,
   ClaimRecord,
   CrawlRunRecord,
+  CrawlScheduleRecord,
   DocumentRecord,
   EntityAliasRecord,
   EntityResolutionCandidateRecord,
@@ -11,6 +12,8 @@ import type {
   LlmRunRecord,
   ReviewQueueRecord,
   SourceRecord,
+  IngestionJobKind,
+  IngestionJobRecord,
   UrlCandidateRecord,
 } from "./records";
 
@@ -84,6 +87,11 @@ export type ResearchRepository = {
   updateCrawlRun(id: string, changes: Partial<CrawlRunRecord>): CrawlRunRecord;
   listCrawlRuns(): CrawlRunRecord[];
 
+  createCrawlSchedule(record: CrawlScheduleRecord): CrawlScheduleRecord;
+  getCrawlSchedule(id: string): CrawlScheduleRecord | undefined;
+  updateCrawlSchedule(id: string, changes: Partial<CrawlScheduleRecord>): CrawlScheduleRecord;
+  listCrawlSchedules(): CrawlScheduleRecord[];
+
   createUrlCandidate(record: UrlCandidateRecord): UrlCandidateRecord;
   getUrlCandidate(id: string): UrlCandidateRecord | undefined;
   updateUrlCandidate(id: string, changes: Partial<UrlCandidateRecord>): UrlCandidateRecord;
@@ -92,6 +100,19 @@ export type ResearchRepository = {
     sourceId: string,
     canonicalUrl: string,
   ): UrlCandidateRecord | undefined;
+
+  createIngestionJob(record: IngestionJobRecord): IngestionJobRecord;
+  getIngestionJob(id: string): IngestionJobRecord | undefined;
+  updateIngestionJob(id: string, changes: Partial<IngestionJobRecord>): IngestionJobRecord;
+  listIngestionJobs(): IngestionJobRecord[];
+  findActiveIngestionJobForUrlCandidate(
+    urlCandidateId: string,
+    jobKind: IngestionJobKind,
+  ): IngestionJobRecord | undefined;
+  findIngestionJobForDocument(
+    documentId: string,
+    jobKind: IngestionJobKind,
+  ): IngestionJobRecord | undefined;
 
   createEntityResolutionTask(record: EntityResolutionTaskRecord): EntityResolutionTaskRecord;
   getEntityResolutionTask(id: string): EntityResolutionTaskRecord | undefined;
@@ -114,7 +135,9 @@ export class InMemoryResearchRepository implements ResearchRepository {
   private readonly reviewQueueItems = new Map<string, ReviewQueueRecord>();
   private readonly llmRuns = new Map<string, LlmRunRecord>();
   private readonly crawlRuns = new Map<string, CrawlRunRecord>();
+  private readonly crawlSchedules = new Map<string, CrawlScheduleRecord>();
   private readonly urlCandidates = new Map<string, UrlCandidateRecord>();
+  private readonly ingestionJobs = new Map<string, IngestionJobRecord>();
   private readonly entityResolutionTasks = new Map<string, EntityResolutionTaskRecord>();
   private readonly entityResolutionCandidates = new Map<string, EntityResolutionCandidateRecord>();
 
@@ -285,6 +308,24 @@ export class InMemoryResearchRepository implements ResearchRepository {
     return Array.from(this.crawlRuns.values(), cloneRecord);
   }
 
+  createCrawlSchedule(record: CrawlScheduleRecord): CrawlScheduleRecord {
+    this.crawlSchedules.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getCrawlSchedule(id: string): CrawlScheduleRecord | undefined {
+    const record = this.crawlSchedules.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  updateCrawlSchedule(id: string, changes: Partial<CrawlScheduleRecord>): CrawlScheduleRecord {
+    return updateStoredRecord(this.crawlSchedules, id, changes);
+  }
+
+  listCrawlSchedules(): CrawlScheduleRecord[] {
+    return Array.from(this.crawlSchedules.values(), cloneRecord);
+  }
+
   createUrlCandidate(record: UrlCandidateRecord): UrlCandidateRecord {
     this.urlCandidates.set(record.id, cloneRecord(record));
     return cloneRecord(record);
@@ -309,6 +350,45 @@ export class InMemoryResearchRepository implements ResearchRepository {
   ): UrlCandidateRecord | undefined {
     return this.listUrlCandidates().find(
       (candidate) => candidate.sourceId === sourceId && candidate.canonicalUrl === canonicalUrl,
+    );
+  }
+
+  createIngestionJob(record: IngestionJobRecord): IngestionJobRecord {
+    this.ingestionJobs.set(record.id, cloneRecord(record));
+    return cloneRecord(record);
+  }
+
+  getIngestionJob(id: string): IngestionJobRecord | undefined {
+    const record = this.ingestionJobs.get(id);
+    return record ? cloneRecord(record) : undefined;
+  }
+
+  updateIngestionJob(id: string, changes: Partial<IngestionJobRecord>): IngestionJobRecord {
+    return updateStoredRecord(this.ingestionJobs, id, changes);
+  }
+
+  listIngestionJobs(): IngestionJobRecord[] {
+    return Array.from(this.ingestionJobs.values(), cloneRecord);
+  }
+
+  findActiveIngestionJobForUrlCandidate(
+    urlCandidateId: string,
+    jobKind: IngestionJobKind,
+  ): IngestionJobRecord | undefined {
+    return this.listIngestionJobs().find(
+      (job) =>
+        job.urlCandidateId === urlCandidateId &&
+        job.jobKind === jobKind &&
+        (job.status === "PENDING" || job.status === "RUNNING"),
+    );
+  }
+
+  findIngestionJobForDocument(
+    documentId: string,
+    jobKind: IngestionJobKind,
+  ): IngestionJobRecord | undefined {
+    return this.listIngestionJobs().find(
+      (job) => job.documentId === documentId && job.jobKind === jobKind,
     );
   }
 

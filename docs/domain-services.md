@@ -6,7 +6,7 @@ Phase 2 introduces a tested domain-service layer under `src/domain`.
 
 - `records.ts` defines camelCase application records that mirror the Phase 1 database tables.
 - `repository.ts` defines the repository contract and an in-memory implementation for unit tests.
-- `services.ts` owns business rules for entities, sources, documents, claims, evidence, reviewer transitions, supersession, and audit logging.
+- `services.ts` owns business rules for entities, sources, documents, claims, evidence, reviewer transitions, supersession, crawl schedules, ingestion job retries, and audit logging.
 - `review-workflow.ts` projects reviewer-facing claim context and coordinates review actions against the domain service.
 - `public-graph.ts` projects safe public graph data from repository records.
 
@@ -52,3 +52,10 @@ It excludes:
 - raw document text, storage paths, source metadata, audit fields, reviewer fields, creator fields, review queue fields, and LLM prompt internals
 
 Public route behavior is documented in [Public API](public-api.md).
+
+## Scheduling Rules
+
+Phase 12 adds crawl schedules and ingestion jobs to the same domain boundary. Schedules require an
+existing source and at least one discovery URL. Jobs validate source, crawl-run, candidate, and
+document references before persistence. Failed jobs return to `PENDING` with bounded exponential
+backoff until `maxAttempts` is exhausted.

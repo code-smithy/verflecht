@@ -2,6 +2,8 @@
 
 Phase 3 introduces manual URL ingestion under `src/ingestion`.
 Phase 11 adds feed and sitemap discovery under `src/ingestion/discovery.ts`.
+Phase 12 adds repeatable crawl scheduling and change detection under
+`src/ingestion/scheduling.ts`.
 
 ## Boundaries
 
@@ -11,6 +13,7 @@ Phase 11 adds feed and sitemap discovery under `src/ingestion/discovery.ts`.
 - `storage.ts` defines the raw-document storage boundary. `SupabaseRawDocumentStorage` writes to Supabase Storage and `InMemoryRawDocumentStorage` is used for deterministic unit tests.
 - `url-ingestion.ts` coordinates fetch, hash, raw-content storage, and immutable document-record creation through the existing domain service.
 - `discovery.ts` parses RSS, Atom, sitemap, and news sitemap documents, then stores discovered URLs as deduplicated URL candidates before document fetching.
+- `scheduling.ts` advances due crawl schedules, creates retryable fetch jobs from pending URL candidates, skips unchanged content, and queues extraction/analysis work for new document versions.
 
 ## Deduplication and Versioning
 
@@ -57,3 +60,11 @@ Phase 11 tests cover:
 - URL candidate canonicalization and deduplication
 - crawl run statistics
 - failed sitemap child isolation
+
+Phase 12 tests cover:
+
+- scheduled crawl configuration
+- retry state transitions
+- unchanged hash skips for extraction and LLM analysis
+- changed hash extraction and analysis job creation
+- idempotent job creation and execution

@@ -8,6 +8,8 @@ Phase 7 adds deterministic evidence-scoring metadata in
 `supabase/migrations/202608180004_phase_7_claim_validation.sql`.
 Phase 11 adds URL discovery candidates in
 `supabase/migrations/202608180005_phase_11_url_discovery.sql`.
+Phase 12 adds scheduled crawl configuration and retryable ingestion jobs in
+`supabase/migrations/202608180006_phase_12_scheduling.sql`.
 
 ## Scope
 
@@ -18,6 +20,7 @@ The migration creates:
 - entity-resolution tasks and candidate rows for ambiguous or low-confidence matches
 - deterministic claim evidence score and compact validation notes
 - URL candidates for RSS, sitemap, news sitemap, and manual discovery
+- crawl schedules and retryable ingestion jobs for repeatable fetch, extraction, and analysis work
 - indexes for graph, document, review, and audit queries
 - a deferrable database trigger that prevents `VERIFIED` claims without at least one evidence record
 - Row Level Security policies that keep internal data private and expose only verified, source-backed claim data through direct public reads
@@ -56,6 +59,9 @@ The public policies also do not expose `entity_resolution_tasks` or
 are internal review data.
 The public policies also do not expose `url_candidates`; discovered URLs are
 internal queue data until they become reviewed, source-backed public claims.
+The public policies also do not expose `crawl_schedules` or `ingestion_jobs`;
+these are internal operational records for fetching, extraction, retries, and
+LLM-analysis scheduling.
 
 ## Local Secrets
 

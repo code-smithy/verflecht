@@ -8,6 +8,9 @@ import type {
   ClaimEvidenceRecord,
   ClaimRecord,
   ClaimRecordDraft,
+  CrawlScheduleDraft,
+  CrawlScheduleFrequency,
+  CrawlScheduleRecord,
   CrawlRunDraft,
   CrawlRunRecord,
   DocumentDraft,
@@ -16,6 +19,9 @@ import type {
   EntityAliasRecord,
   EntityDraft,
   EntityRecord,
+  IngestionJobDraft,
+  IngestionJobKind,
+  IngestionJobRecord,
   JsonRecord,
   SourceDraft,
   SourceRecord,
@@ -75,6 +81,32 @@ function claimAuditValue(claim: ClaimRecord): JsonRecord {
     objectEntityId: claim.objectEntityId,
     supersedesClaimId: claim.supersedesClaimId,
   };
+}
+
+function nextRunAfter(date: Date, frequency: CrawlScheduleFrequency): Date {
+  const next = new Date(date);
+
+  if (frequency === "HOURLY") {
+    next.setUTCHours(next.getUTCHours() + 1);
+    return next;
+  }
+
+  if (frequency === "DAILY") {
+    next.setUTCDate(next.getUTCDate() + 1);
+    return next;
+  }
+
+  if (frequency === "WEEKLY") {
+    next.setUTCDate(next.getUTCDate() + 7);
+    return next;
+  }
+
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  return next;
+}
+
+function retryDelayMs(attempts: number): number {
+  return Math.min(60, 2 ** Math.max(0, attempts - 1)) * 60 * 1000;
 }
 
 export class ResearchDomainService {
@@ -183,6 +215,231 @@ export class ResearchDomainService {
     return this.repository.updateCrawlRun(crawlRunId, {
       ...changes,
       updatedAt: this.clock(),
+    });
+  }
+
+  createCrawlSchedule(draft: CrawlScheduleDraft): CrawlScheduleRecord {
+    if (!this.repository.getSource(draft.sourceId)) {
+      throw new Error("Cannot create a crawl schedule for an unknown source.");
+    }
+
+    if (draft.discoveryUrls.length === 0) {
+      throw new Error("Crawl schedules require at least one discovery URL.");
+    }
+
+    for (const url of draft.discoveryUrls) {
+      assertNonEmpty(url, "discoveryUrl");
+    }
+
+    const now = this.clock();
+    return this.repository.createCrawlSchedule({
+      ...draft,
+      discoveryUrls: [...draft.discoveryUrls],
+      id: this.idFactory(),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  updateCrawlSchedule(
+    scheduleId: string,
+    changes: Partial<CrawlScheduleRecord>,
+  ): CrawlScheduleRecord {
+    const current = this.repository.getCrawlSchedule(scheduleId);
+
+    if (!current) {
+      throw new Error("Crawl schedule does not exist.");
+    }
+
+    if (changes.discoveryUrls && changes.discoveryUrls.length === 0) {
+      throw new Error("Crawl schedules require at least one discovery URL.");
+    }
+
+    const update: Partial<CrawlScheduleRecord> = {
+      ...changes,
+      updatedAt: this.clock(),
+    };
+
+    if (changes.discoveryUrls) {
+      update.discoveryUrls = [...changes.discoveryUrls];
+    }
+
+    return this.repository.updateCrawlSchedule(scheduleId, update);
+  }
+
+  listDueCrawlSchedules(at: Date = this.clock()): CrawlScheduleRecord[] {
+    return this.repository
+      .listCrawlSchedules()
+      .filter((schedule) => schedule.status === "ACTIVE" && schedule.nextRunAt <= at)
+      .sort((left, right) => left.nextRunAt.getTime() - right.nextRunAt.getTime());
+  }
+
+  markCrawlScheduleRun(scheduleId: string, runAt: Date = this.clock()): CrawlScheduleRecord {
+    const schedule = this.repository.getCrawlSchedule(scheduleId);
+
+    if (!schedule) {
+      throw new Error("Crawl schedule does not exist.");
+    }
+
+    return this.updateCrawlSchedule(scheduleId, {
+      lastRunAt: runAt,
+      nextRunAt: nextRunAfter(runAt, schedule.frequency),
+    });
+  }
+
+  createIngestionJob(draft: IngestionJobDraft): IngestionJobRecord {
+    this.assertIngestionJobReferencesExist(draft);
+
+    if (draft.attempts < 0) {
+      throw new Error("Ingestion job attempts cannot be negative.");
+    }
+
+    if (draft.maxAttempts < 1) {
+      throw new Error("Ingestion jobs require at least one allowed attempt.");
+    }
+
+    const now = this.clock();
+    return this.repository.createIngestionJob({
+      ...draft,
+      id: this.idFactory(),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  createOrReuseUrlCandidateJob(
+    urlCandidateId: string,
+    jobKind: Extract<IngestionJobKind, "FETCH_URL">,
+    options: { scheduledAt?: Date; maxAttempts?: number; metadata?: JsonRecord } = {},
+  ): IngestionJobRecord {
+    const candidate = this.repository.getUrlCandidate(urlCandidateId);
+
+    if (!candidate) {
+      throw new Error("Cannot create an ingestion job for an unknown URL candidate.");
+    }
+
+    const existing = this.repository.findActiveIngestionJobForUrlCandidate(urlCandidateId, jobKind);
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.createIngestionJob({
+      sourceId: candidate.sourceId,
+      crawlRunId: candidate.crawlRunId,
+      urlCandidateId,
+      jobKind,
+      status: "PENDING",
+      attempts: 0,
+      maxAttempts: options.maxAttempts ?? 3,
+      scheduledAt: options.scheduledAt ?? this.clock(),
+      metadata: options.metadata ?? {},
+    });
+  }
+
+  createOrReuseDocumentJob(
+    documentId: string,
+    jobKind: Extract<IngestionJobKind, "EXTRACT_DOCUMENT" | "ANALYZE_DOCUMENT">,
+    options: { scheduledAt?: Date; maxAttempts?: number; metadata?: JsonRecord } = {},
+  ): IngestionJobRecord {
+    const document = this.repository.getDocument(documentId);
+
+    if (!document) {
+      throw new Error("Cannot create an ingestion job for an unknown document.");
+    }
+
+    const existing = this.repository.findIngestionJobForDocument(documentId, jobKind);
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.createIngestionJob({
+      sourceId: document.sourceId,
+      documentId,
+      jobKind,
+      status: "PENDING",
+      attempts: 0,
+      maxAttempts: options.maxAttempts ?? 3,
+      scheduledAt: options.scheduledAt ?? this.clock(),
+      metadata: options.metadata ?? {},
+    });
+  }
+
+  listDueIngestionJobs(jobKind: IngestionJobKind, at: Date = this.clock()): IngestionJobRecord[] {
+    return this.repository
+      .listIngestionJobs()
+      .filter((job) => job.jobKind === jobKind && job.status === "PENDING" && job.scheduledAt <= at)
+      .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime());
+  }
+
+  startIngestionJob(jobId: string): IngestionJobRecord {
+    const job = this.getExistingIngestionJob(jobId);
+
+    if (job.status !== "PENDING") {
+      throw new Error("Only pending ingestion jobs can be started.");
+    }
+
+    if (job.attempts >= job.maxAttempts) {
+      throw new Error("Ingestion job has no retry attempts remaining.");
+    }
+
+    const now = this.clock();
+
+    return this.repository.updateIngestionJob(jobId, {
+      status: "RUNNING",
+      attempts: job.attempts + 1,
+      lockedAt: now,
+      errorMessage: undefined,
+      updatedAt: now,
+    });
+  }
+
+  completeIngestionJob(
+    jobId: string,
+    metadata: JsonRecord = {},
+    status: Extract<IngestionJobRecord["status"], "SUCCEEDED" | "SKIPPED"> = "SUCCEEDED",
+  ): IngestionJobRecord {
+    const job = this.getExistingIngestionJob(jobId);
+
+    if (job.status !== "RUNNING") {
+      throw new Error("Only running ingestion jobs can be completed.");
+    }
+
+    const now = this.clock();
+
+    return this.repository.updateIngestionJob(jobId, {
+      status,
+      finishedAt: now,
+      lockedAt: undefined,
+      metadata: {
+        ...job.metadata,
+        ...metadata,
+      },
+      updatedAt: now,
+    });
+  }
+
+  failIngestionJob(jobId: string, errorMessage: string): IngestionJobRecord {
+    const job = this.getExistingIngestionJob(jobId);
+
+    if (job.status !== "RUNNING") {
+      throw new Error("Only running ingestion jobs can fail.");
+    }
+
+    const retryable = job.attempts < job.maxAttempts;
+
+    const now = this.clock();
+
+    return this.repository.updateIngestionJob(jobId, {
+      status: retryable ? "PENDING" : "FAILED",
+      scheduledAt: retryable
+        ? new Date(now.getTime() + retryDelayMs(job.attempts))
+        : job.scheduledAt,
+      finishedAt: retryable ? undefined : now,
+      lockedAt: undefined,
+      errorMessage,
+      updatedAt: now,
     });
   }
 
@@ -418,6 +675,34 @@ export class ResearchDomainService {
     }
 
     return claim;
+  }
+
+  private getExistingIngestionJob(jobId: string): IngestionJobRecord {
+    const job = this.repository.getIngestionJob(jobId);
+
+    if (!job) {
+      throw new Error("Ingestion job does not exist.");
+    }
+
+    return job;
+  }
+
+  private assertIngestionJobReferencesExist(job: IngestionJobDraft): void {
+    if (!this.repository.getSource(job.sourceId)) {
+      throw new Error("Cannot create an ingestion job for an unknown source.");
+    }
+
+    if (job.crawlRunId && !this.repository.getCrawlRun(job.crawlRunId)) {
+      throw new Error("Cannot create an ingestion job for an unknown crawl run.");
+    }
+
+    if (job.urlCandidateId && !this.repository.getUrlCandidate(job.urlCandidateId)) {
+      throw new Error("Cannot create an ingestion job for an unknown URL candidate.");
+    }
+
+    if (job.documentId && !this.repository.getDocument(job.documentId)) {
+      throw new Error("Cannot create an ingestion job for an unknown document.");
+    }
   }
 
   private writeAuditLog(
