@@ -18,20 +18,33 @@ on public.entities,
    public.claim_evidence
 to anon;
 
-grant select, insert, update, delete
-on public.sources,
-   public.entities,
-   public.entity_aliases,
-   public.documents,
-   public.claims,
-   public.claim_evidence,
-   public.review_queue,
-   public.audit_log,
-   public.llm_runs,
-   public.crawl_runs,
-   public.entity_resolution_tasks,
-   public.entity_resolution_candidates,
-   public.url_candidates,
-   public.crawl_schedules,
-   public.ingestion_jobs
-to authenticated;
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'sources',
+    'entities',
+    'entity_aliases',
+    'documents',
+    'claims',
+    'claim_evidence',
+    'review_queue',
+    'audit_log',
+    'llm_runs',
+    'crawl_runs',
+    'entity_resolution_tasks',
+    'entity_resolution_candidates',
+    'url_candidates',
+    'crawl_schedules',
+    'ingestion_jobs'
+  ]
+  loop
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format(
+        'grant select, insert, update, delete on table public.%I to authenticated',
+        table_name
+      );
+    end if;
+  end loop;
+end $$;
