@@ -604,7 +604,8 @@ dd {
 
 .public-page,
 .login-page,
-.internal-shell {
+.internal-shell,
+.auth-status-page {
   min-height: calc(100vh - 62px);
 }
 
@@ -700,10 +701,47 @@ dd {
   justify-content: center;
 }
 
+.auth-status-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 42px 24px;
+}
+
 .login-panel {
+  display: grid;
+  gap: 16px;
   max-width: 430px;
   padding: 26px;
   width: 100%;
+}
+
+.login-panel h1,
+.login-panel p {
+  margin-block: 0;
+}
+
+.discord-login-button {
+  background: #5865f2;
+  border-color: #5865f2;
+  color: #ffffff;
+  padding: 0 16px;
+  width: 100%;
+}
+
+.discord-login-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.auth-alert {
+  background: #fff6dd;
+  border: 1px solid #efd18a;
+  border-radius: 6px;
+  color: #61460d;
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 12px;
 }
 
 .admin-form {
@@ -747,6 +785,29 @@ dd {
 
 .internal-sidebar .app-mark {
   color: #aab7c3;
+}
+
+.internal-account {
+  border-top: 1px solid rgb(255 255 255 / 14%);
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.internal-account span {
+  color: #dbe5ea;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.internal-account button {
+  background: transparent;
+  border-color: rgb(255 255 255 / 22%);
+  color: #ffffff;
+  justify-content: center;
+  padding: 0 12px;
 }
 
 .internal-nav {
