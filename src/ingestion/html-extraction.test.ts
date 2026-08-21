@@ -24,7 +24,7 @@ describe("HTML extraction", () => {
               "description": "Structured summary.",
               "inLanguage": "de-CH"
             }
-          </script>
+          </script >
         </head>
         <body>
           <article>
@@ -166,6 +166,28 @@ describe("HTML extraction", () => {
       `),
     ).toMatchObject({
       extractionStatus: "FAILED",
+    });
+  });
+
+  it("strips invisible content with malformed HTML end tags", () => {
+    const result = extractHtmlDocument(`
+      <html>
+        <body>
+          <main>
+            <p>Visible body.</p>
+            <!-- Hidden comment --!>
+            <script>alert("hidden script");</script >
+            <style>.hidden { display: none; }</style data-invalid="true">
+            <noscript>Hidden noscript fallback.</noscript ignored>
+            <svg><text>Hidden vector text.</text></svg >
+          </main>
+        </body>
+      </html>
+    `);
+
+    expect(result).toMatchObject({
+      bodyText: "Visible body.",
+      extractionStatus: "PARTIAL",
     });
   });
 

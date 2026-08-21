@@ -24,8 +24,20 @@ type HtmlMetadata = {
   byProperty: Map<string, string>;
   byItemprop: Map<string, string>;
 };
+type InvisibleElementName =
+  | "script"
+  | "style"
+  | "noscript"
+  | "svg"
+  | "nav"
+  | "header"
+  | "footer";
 
 const FIELD_ORDER: FieldSource[] = ["jsonLd", "schemaOrg", "openGraph", "html", "visibleContent"];
+const HTML_COMMENT_PATTERN = /<!--[\s\S]*?--!?>/gu;
+const INVISIBLE_ELEMENT_PATTERNS = (
+  ["script", "style", "noscript", "svg", "nav", "header", "footer"] as InvisibleElementName[]
+).map((tagName) => new RegExp(`<${tagName}\\b[\\s\\S]*?<\\/${tagName}\\b[^>]*>`, "giu"));
 
 function decodeHtmlEntity(entity: string): string {
   const namedEntities: Record<string, string> = {
@@ -203,7 +215,7 @@ function collectJsonLd(html: string): FieldValues {
   const values: FieldValues = {};
 
   for (const match of html.matchAll(
-    /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/giu,
+    /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\b[^>]*>/giu,
   )) {
     try {
       const parsed = JSON.parse(decodeHtml(match[1] ?? ""));
@@ -272,15 +284,10 @@ function collectHtml(html: string, meta: HtmlMetadata): FieldValues {
 }
 
 function stripInvisibleContent(html: string): string {
-  return html
-    .replace(/<!--[\s\S]*?-->/gu, " ")
-    .replace(/<script\b[\s\S]*?<\/script>/giu, " ")
-    .replace(/<style\b[\s\S]*?<\/style>/giu, " ")
-    .replace(/<noscript\b[\s\S]*?<\/noscript>/giu, " ")
-    .replace(/<svg\b[\s\S]*?<\/svg>/giu, " ")
-    .replace(/<nav\b[\s\S]*?<\/nav>/giu, " ")
-    .replace(/<header\b[\s\S]*?<\/header>/giu, " ")
-    .replace(/<footer\b[\s\S]*?<\/footer>/giu, " ");
+  return INVISIBLE_ELEMENT_PATTERNS.reduce(
+    (visibleHtml, pattern) => visibleHtml.replace(pattern, " "),
+    html.replace(HTML_COMMENT_PATTERN, " "),
+  );
 }
 
 function selectBodyHtml(html: string): string {
