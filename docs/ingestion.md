@@ -14,6 +14,13 @@ Phase 12 adds repeatable crawl scheduling and change detection under
 - `url-ingestion.ts` coordinates fetch, hash, raw-content storage, and immutable document-record creation through the existing domain service.
 - `discovery.ts` parses RSS, Atom, sitemap, and news sitemap documents, then stores discovered URLs as deduplicated URL candidates before document fetching.
 - `scheduling.ts` advances due crawl schedules, creates retryable fetch jobs from pending URL candidates, skips unchanged content, and queues extraction/analysis work for new document versions.
+- `/app/ingest` creates manual `url_candidates` rows and pending `FETCH_URL` `ingestion_jobs`
+  for selected sources.
+- `/api/ingestion/process-fetch-jobs` processes due pending `FETCH_URL` jobs server-side,
+  stores raw content in Supabase Storage, creates immutable `documents`, and queues
+  `EXTRACT_DOCUMENT` and `ANALYZE_DOCUMENT` jobs for new or changed content.
+- `/app/runs` displays recent URL candidates, ingestion jobs, and crawl runs, and can trigger
+  one due fetch job at a time for manual operation.
 
 ## Deduplication and Versioning
 

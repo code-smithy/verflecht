@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 import type {
   AccessStatus,
   ConnectionClass,
@@ -20,6 +18,7 @@ import type {
   JsonRecord,
   SourceRecord,
 } from "@/domain/records";
+import { createServiceRoleSupabaseClient } from "@/server/supabase-server";
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -27,7 +26,7 @@ type SupabaseTable =
   "sources" | "entities" | "entity_aliases" | "documents" | "claims" | "claim_evidence";
 
 export async function loadPublicResearchRepository(): Promise<InMemoryResearchRepository> {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceRoleSupabaseClient();
   const repository = new InMemoryResearchRepository();
   const [sources, entities, aliases, documents, claims, evidence] = await Promise.all([
     selectRows(supabase, "sources"),
@@ -84,24 +83,8 @@ export async function loadPublicResearchRepository(): Promise<InMemoryResearchRe
   return repository;
 }
 
-function createServerSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase public API environment is not configured.");
-  }
-
-  return createClient(url, key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
-
 async function selectRows(
-  supabase: ReturnType<typeof createServerSupabaseClient>,
+  supabase: ReturnType<typeof createServiceRoleSupabaseClient>,
   table: SupabaseTable,
 ): Promise<SupabaseRow[]> {
   const { data, error } = await supabase.from(table).select("*");

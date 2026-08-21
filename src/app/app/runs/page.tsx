@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getBrowserSupabaseClient } from "@/app/auth-client";
+import { buildSiteUrl } from "@/app/auth-paths";
 
 import {
   ingestionJobSelectColumns,
@@ -30,6 +31,8 @@ type CrawlRunRow = {
   updated_at: string;
 };
 
+type ProcessState = "idle" | "processing" | "processed" | "error";
+
 export default function CrawlRunsPage() {
   const supabase = useMemo(() => getBrowserSupabaseClient(), []);
   const [jobs, setJobs] = useState<IngestionJobRow[]>([]);
@@ -38,6 +41,8 @@ export default function CrawlRunsPage() {
   const [sources, setSources] = useState<SourceRegistryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processState, setProcessState] = useState<ProcessState>("idle");
+  const [processMessage, setProcessMessage] = useState<string | null>(null);
 
   const sourcesById = useMemo(
     () => new Map(sources.map((source) => [source.id, source])),
@@ -48,10 +53,8 @@ export default function CrawlRunsPage() {
     [candidates],
   );
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadOperations() {
+  const loadOperations = useCallback(
+    async (options: { active?: () => boolean } = {}) => {
       if (!supabase) {
         setError("Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to load runs.");
         setIsLoading(false);
@@ -77,7 +80,7 @@ export default function CrawlRunsPage() {
         supabase.from("sources").select(sourceSelectColumns),
       ]);
 
-      if (!active) {
+      if (options.active && !options.active()) {
         return;
       }
 
@@ -95,14 +98,80 @@ export default function CrawlRunsPage() {
       setCandidates((candidatesResult.data ?? []) as UrlCandidateRow[]);
       setCrawlRuns((crawlRunsResult.data ?? []) as CrawlRunRow[]);
       setSources((sourcesResult.data ?? []) as SourceRegistryRow[]);
-    }
+    },
+    [supabase],
+  );
 
-    void loadOperations();
+  useEffect(() => {
+    let active = true;
+
+    void loadOperations({ active: () => active });
 
     return () => {
       active = false;
     };
-  }, [supabase]);
+  }, [loadOperations]);
+
+  async function processPendingFetchJob() {
+    setProcessState("processing");
+    setProcessMessage(null);
+
+    if (!supabase) {
+      setProcessState("error");
+      setProcessMessage(
+        "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to process jobs.",
+      );
+      return;
+    }
+
+    const { data, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !data.session) {
+      setProcessState("error");
+      setProcessMessage(sessionError?.message ?? "Sign in before processing jobs.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        buildSiteUrl(window.location.origin, "/api/ingestion/process-fetch-jobs/"),
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${data.session.access_token}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ limit: 1 }),
+        },
+      );
+      const payload = (await response.json()) as {
+        processed?: number;
+        error?: string;
+        results?: Array<{ outcome: string; errorMessage?: string }>;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Processor returned ${response.status}.`);
+      }
+
+      const outcome = payload.results?.[0]?.outcome;
+      const errorMessage = payload.results?.[0]?.errorMessage;
+      setProcessState("processed");
+      setProcessMessage(
+        payload.processed === 0
+          ? "No due pending fetch jobs found."
+          : errorMessage
+            ? `${outcome}: ${errorMessage}`
+            : `Processed ${payload.processed} fetch job${payload.processed === 1 ? "" : "s"}.`,
+      );
+      await loadOperations();
+    } catch (processError) {
+      setProcessState("error");
+      setProcessMessage(
+        processError instanceof Error ? processError.message : "Could not process fetch jobs.",
+      );
+    }
+  }
 
   return (
     <main className="workspace-page">
@@ -119,7 +188,24 @@ export default function CrawlRunsPage() {
       ) : null}
 
       <section className="workspace-panel">
-        <h2>Ingestion jobs</h2>
+        <div className="panel-heading-row">
+          <h2>Ingestion jobs</h2>
+          <button
+            disabled={processState === "processing"}
+            onClick={processPendingFetchJob}
+            type="button"
+          >
+            {processState === "processing" ? "Processing..." : "Process pending fetch job"}
+          </button>
+        </div>
+        {processMessage ? (
+          <div
+            className={processState === "error" ? "form-status error" : "form-status success"}
+            role={processState === "error" ? "alert" : "status"}
+          >
+            {processMessage}
+          </div>
+        ) : null}
         {isLoading ? <p className="muted-copy">Loading jobs...</p> : null}
         {!isLoading && jobs.length === 0 ? (
           <div className="empty-state compact">
