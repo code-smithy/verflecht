@@ -899,6 +899,99 @@ dd {
   margin: 0;
 }
 
+.source-workspace {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+}
+
+.source-list-panel {
+  position: sticky;
+  top: 84px;
+}
+
+.panel-heading-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.panel-heading-row button {
+  background: transparent;
+  color: var(--accent-strong);
+  padding: 0 12px;
+}
+
+.source-list {
+  display: grid;
+  gap: 10px;
+}
+
+.source-list button {
+  background: #ffffff;
+  display: grid;
+  gap: 5px;
+  min-height: 84px;
+  padding: 12px;
+  text-align: left;
+}
+
+.source-list button.active,
+.source-list button[aria-current="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(23 107 135 / 14%);
+}
+
+.source-list span,
+.source-list small,
+.muted-copy,
+.record-id {
+  color: var(--muted);
+}
+
+.source-list span,
+.source-list small {
+  overflow-wrap: anywhere;
+}
+
+.source-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-form .form-status,
+.source-form button,
+.checkbox-grid {
+  grid-column: 1 / -1;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.checkbox-grid label {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.checkbox-grid input {
+  height: 18px;
+  width: 18px;
+}
+
+.empty-state.compact {
+  min-height: 180px;
+}
+
 .check-list {
   display: grid;
   gap: 10px;
@@ -940,6 +1033,7 @@ dd {
 @media (max-width: 1020px) {
   .public-shell,
   .research-grid,
+  .source-workspace,
   .internal-shell {
     grid-template-columns: 1fr;
   }
@@ -955,6 +1049,10 @@ dd {
 
   .internal-sidebar {
     padding: 18px;
+  }
+
+  .source-list-panel {
+    position: static;
   }
 
   .internal-nav {
@@ -1012,6 +1110,8 @@ dd {
   }
 
   .admin-form.compact,
+  .source-form,
+  .checkbox-grid,
   .metric-grid,
   .status-grid {
     grid-template-columns: 1fr;
