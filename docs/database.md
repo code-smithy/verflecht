@@ -10,6 +10,8 @@ Phase 11 adds URL discovery candidates in
 `supabase/migrations/202608180005_phase_11_url_discovery.sql`.
 Phase 12 adds scheduled crawl configuration and retryable ingestion jobs in
 `supabase/migrations/202608180006_phase_12_scheduling.sql`.
+Phase 13 grants Supabase API role privileges required for PostgREST access in
+`supabase/migrations/202608210001_phase_13_api_role_privileges.sql`.
 
 ## Scope
 
@@ -24,6 +26,7 @@ The migration creates:
 - indexes for graph, document, review, and audit queries
 - a deferrable database trigger that prevents `VERIFIED` claims without at least one evidence record
 - Row Level Security policies that keep internal data private and expose only verified, source-backed claim data through direct public reads
+- API role grants that let PostgREST reach the RLS-protected tables before policies decide row and operation access
 
 ## App Roles
 
