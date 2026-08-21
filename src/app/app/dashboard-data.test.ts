@@ -132,8 +132,7 @@ describe("dashboard data", () => {
         {
           ingestion_jobs: {
             code: "PGRST205",
-            message:
-              "Could not find the table 'public.ingestion_jobs' in the schema cache",
+            message: "Could not find the table 'public.ingestion_jobs' in the schema cache",
           },
         },
       ),

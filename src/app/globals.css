@@ -763,6 +763,31 @@ dd {
   padding: 0 14px;
 }
 
+.admin-form button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.form-status {
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.form-status.error {
+  background: #fbecea;
+  border: 1px solid #e6b8b3;
+  color: #74302c;
+}
+
+.form-status.success {
+  background: #e8f6ee;
+  border: 1px solid #b7d9c6;
+  color: #1f5e3d;
+}
+
 .internal-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
