@@ -802,6 +802,12 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.internal-account small {
+  color: #aab7c3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .internal-account button {
   background: transparent;
   border-color: rgb(255 255 255 / 22%);
@@ -838,7 +844,7 @@ dd {
 .metric-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .metric-card {

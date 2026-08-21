@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
+import { getUserAppRole, isInternalAppRole } from "../auth-roles";
 import { getBrowserSupabaseClient } from "../auth-client";
 
 const internalLinks = [
@@ -25,6 +26,7 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [configMissing, setConfigMissing] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -52,7 +54,15 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (!isInternalAppRole(getUserAppRole(data.session.user))) {
+        setUser(data.session.user);
+        setAccessDenied(true);
+        setIsChecking(false);
+        return;
+      }
+
       setUser(data.session.user);
+      setAccessDenied(false);
       setIsChecking(false);
     }
 
@@ -61,11 +71,20 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
     const subscription = supabase?.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         setUser(null);
+        setAccessDenied(false);
         redirectToLogin();
         return;
       }
 
+      if (!isInternalAppRole(getUserAppRole(session.user))) {
+        setUser(session.user);
+        setAccessDenied(true);
+        setIsChecking(false);
+        return;
+      }
+
       setUser(session.user);
+      setAccessDenied(false);
       setIsChecking(false);
     });
 
@@ -104,6 +123,21 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <main className="auth-status-page">
+        <section className="login-panel">
+          <p className="app-mark">Verflecht</p>
+          <h1>Access denied</h1>
+          <p>Your Supabase session does not include an internal app role.</p>
+          <button onClick={signOut} type="button">
+            Sign out
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="internal-shell">
       <aside className="internal-sidebar" aria-label="Internal workspace navigation">
@@ -125,6 +159,7 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="internal-account">
           <span>{getDisplayName(user)}</span>
+          <small>{getUserAppRole(user)}</small>
           <button onClick={signOut} type="button">
             Sign out
           </button>
