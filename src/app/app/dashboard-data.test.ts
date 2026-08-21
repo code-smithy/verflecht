@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { loadDashboardSnapshot, type DashboardSupabaseClient } from "./dashboard-data";
 
 type Row = Record<string, unknown>;
+type QueryError = { message: string; code?: string };
 
 class Query {
   private readonly filters: Array<(row: Row) => boolean> = [];
@@ -10,6 +11,7 @@ class Query {
   constructor(
     private readonly rows: Row[],
     private readonly options?: { count?: "exact"; head?: boolean },
+    private readonly error?: QueryError,
   ) {}
 
   in(column: string, values: readonly string[]): Query {
@@ -21,6 +23,14 @@ class Query {
     onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
+    if (this.error) {
+      const value = this.options?.head
+        ? { count: null, error: this.error }
+        : { data: null, error: this.error };
+
+      return Promise.resolve(value).then(onfulfilled, onrejected);
+    }
+
     const filteredRows = this.rows.filter((row) => this.filters.every((filter) => filter(row)));
     const value = this.options?.head
       ? { count: filteredRows.length, error: null }
@@ -30,12 +40,15 @@ class Query {
   }
 }
 
-function mockSupabase(tables: Record<string, Row[]>): DashboardSupabaseClient {
+function mockSupabase(
+  tables: Record<string, Row[]>,
+  tableErrors: Record<string, QueryError> = {},
+): DashboardSupabaseClient {
   return {
     from(table: string) {
       return {
         select(_columns: string, options?: { count?: "exact"; head?: boolean }) {
-          return new Query(tables[table] ?? [], options) as never;
+          return new Query(tables[table] ?? [], options, tableErrors[table]) as never;
         },
       };
     },
@@ -104,6 +117,43 @@ describe("dashboard data", () => {
       dueRetryableFailures: 1,
       exhaustedFailures: 1,
       runningJobs: 1,
+    });
+  });
+
+  it("keeps dashboard counts available when the optional ingestion jobs table is not deployed", async () => {
+    const snapshot = await loadDashboardSnapshot(
+      mockSupabase(
+        {
+          sources: [{ id: "source-1" }],
+          documents: [],
+          claims: [],
+          review_queue: [],
+        },
+        {
+          ingestion_jobs: {
+            code: "PGRST205",
+            message:
+              "Could not find the table 'public.ingestion_jobs' in the schema cache",
+          },
+        },
+      ),
+      "ADMIN",
+      new Date("2026-08-18T10:02:00.000Z"),
+    );
+
+    expect(snapshot.metrics.map((metric) => [metric.label, metric.value])).toEqual([
+      ["Sources", "1"],
+      ["Documents", "0"],
+      ["Pending Claims", "0"],
+      ["Public Claims", "0"],
+      ["Review Workload", "0"],
+      ["Retryable Jobs", "0"],
+    ]);
+    expect(snapshot.ingestionWork).toEqual({
+      retryableFailures: 0,
+      dueRetryableFailures: 0,
+      exhaustedFailures: 0,
+      runningJobs: 0,
     });
   });
 });

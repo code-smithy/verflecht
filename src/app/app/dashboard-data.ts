@@ -2,12 +2,17 @@ import type { UserRole } from "@/domain/ontology";
 
 type CountResult = {
   count: number | null;
-  error: { message: string } | null;
+  error: QueryError | null;
 };
 
 type SelectResult<T> = {
   data: T[] | null;
-  error: { message: string } | null;
+  error: QueryError | null;
+};
+
+type QueryError = {
+  message: string;
+  code?: string;
 };
 
 type CountQuery = PromiseLike<CountResult> & {
@@ -120,7 +125,7 @@ export async function loadDashboardSnapshot(
     selectTableRows<ClaimStatusRow>(supabase, "claims", "id,verification_status", (query) =>
       query.in("verification_status", reviewCandidateStatuses),
     ),
-    selectTableRows<IngestionJobStatusRow>(
+    selectOptionalSchemaTableRows<IngestionJobStatusRow>(
       supabase,
       "ingestion_jobs",
       "id,status,attempts,max_attempts,scheduled_at,error_message",
@@ -223,6 +228,26 @@ async function selectTableRows<T>(
   return data ?? [];
 }
 
+async function selectOptionalSchemaTableRows<T>(
+  supabase: DashboardSupabaseClient,
+  table: string,
+  columns: string,
+  filter?: (query: SelectQuery<T>) => SelectQuery<T>,
+): Promise<T[]> {
+  const baseQuery = supabase.from(table).select<T>(columns);
+  const { data, error } = await (filter ? filter(baseQuery) : baseQuery);
+
+  if (error) {
+    if (isMissingTableSchemaCacheError(error, table)) {
+      return [];
+    }
+
+    throw new Error(`Failed to load ${table}: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
 function isRetryableFailure(job: IngestionJobStatusRow): boolean {
   return (
     job.status === "PENDING" &&
@@ -234,4 +259,15 @@ function isRetryableFailure(job: IngestionJobStatusRow): boolean {
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function isMissingTableSchemaCacheError(error: QueryError, table: string): boolean {
+  const message = error.message.toLowerCase();
+  const tableName = table.toLowerCase();
+
+  return (
+    (error.code === "PGRST205" ||
+      (message.includes("could not find the table") && message.includes("schema cache"))) &&
+    (message.includes(`public.${tableName}`) || message.includes(`'${tableName}'`))
+  );
 }
