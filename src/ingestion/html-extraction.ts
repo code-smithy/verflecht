@@ -24,14 +24,7 @@ type HtmlMetadata = {
   byProperty: Map<string, string>;
   byItemprop: Map<string, string>;
 };
-type InvisibleElementName =
-  | "script"
-  | "style"
-  | "noscript"
-  | "svg"
-  | "nav"
-  | "header"
-  | "footer";
+type InvisibleElementName = "script" | "style" | "noscript" | "svg" | "nav" | "header" | "footer";
 
 const FIELD_ORDER: FieldSource[] = ["jsonLd", "schemaOrg", "openGraph", "html", "visibleContent"];
 const HTML_COMMENT_PATTERN = /<!--[\s\S]*?--!?>/gu;
