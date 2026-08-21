@@ -1030,6 +1030,53 @@ dd {
   overflow-x: auto;
 }
 
+.ops-table td:first-child,
+.ops-table th:first-child {
+  min-width: 150px;
+}
+
+.ops-table td:nth-child(3) {
+  max-width: 360px;
+  overflow-wrap: anywhere;
+}
+
+.status-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.status-pill.pending,
+.status-pill.running,
+.status-pill.open,
+.status-pill.assigned {
+  background: #fff6dd;
+  color: var(--amber);
+}
+
+.status-pill.succeeded,
+.status-pill.fetched,
+.status-pill.verified {
+  background: #e8f6ee;
+  color: var(--green);
+}
+
+.status-pill.failed,
+.status-pill.rejected {
+  background: #fbecea;
+  color: var(--red);
+}
+
+.status-pill.skipped,
+.status-pill.partial,
+.status-pill.disputed,
+.status-pill.outdated {
+  background: #eceef2;
+  color: #555b66;
+}
+
 @media (max-width: 1020px) {
   .public-shell,
   .research-grid,

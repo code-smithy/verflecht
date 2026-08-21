@@ -4,14 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getBrowserSupabaseClient } from "@/app/auth-client";
 
+import { createManualIngestionJob, type ManualIngestionResult } from "./manual-ingest";
 import { sourceSelectColumns, type SourceRegistryRow } from "../sources/source-registry";
+
+type SubmitState = "idle" | "submitting" | "submitted" | "error";
 
 export default function IngestPage() {
   const supabase = useMemo(() => getBrowserSupabaseClient(), []);
   const [sources, setSources] = useState<SourceRegistryRow[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [url, setUrl] = useState("");
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [sourceError, setSourceError] = useState<string | null>(null);
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<ManualIngestionResult | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +61,51 @@ export default function IngestPage() {
     };
   }, [supabase]);
 
+  async function submitManualIngestion() {
+    setSubmitMessage(null);
+    setResult(null);
+
+    if (!supabase) {
+      setSubmitState("error");
+      setSubmitMessage(
+        "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to create ingestion jobs.",
+      );
+      return;
+    }
+
+    if (!selectedSourceId) {
+      setSubmitState("error");
+      setSubmitMessage("Select a source before creating an ingestion job.");
+      return;
+    }
+
+    if (!url.trim()) {
+      setSubmitState("error");
+      setSubmitMessage("Enter a URL before creating an ingestion job.");
+      return;
+    }
+
+    setSubmitState("submitting");
+
+    try {
+      const nextResult = await createManualIngestionJob(supabase, {
+        sourceId: selectedSourceId,
+        url,
+      });
+
+      setResult(nextResult);
+      setSubmitState("submitted");
+      setSubmitMessage(
+        nextResult.reusedJob
+          ? "An active fetch job already exists for this URL."
+          : "Created a pending fetch job for this URL.",
+      );
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitMessage(error instanceof Error ? error.message : "Could not create ingestion job.");
+    }
+  }
+
   return (
     <main className="workspace-page">
       <header className="workspace-header">
@@ -90,20 +142,37 @@ export default function IngestPage() {
           ) : null}
           <label>
             <span>URL</span>
-            <input placeholder="https://example.ch/article" type="url" />
+            <input
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://example.ch/article"
+              type="url"
+              value={url}
+            />
           </label>
-          <button disabled={!selectedSourceId} type="button">
-            Create ingestion job
+          {submitMessage ? (
+            <div
+              className={submitState === "submitted" ? "form-status success" : "form-status error"}
+              role={submitState === "submitted" ? "status" : "alert"}
+            >
+              {submitMessage}
+            </div>
+          ) : null}
+          <button
+            disabled={!selectedSourceId || submitState === "submitting"}
+            onClick={submitManualIngestion}
+            type="button"
+          >
+            {submitState === "submitting" ? "Creating..." : "Create ingestion job"}
           </button>
         </form>
       </section>
       <section className="workspace-panel">
         <h2>Expected output</h2>
         <div className="status-grid">
-          <span>Canonical URL</span>
-          <span>Fetch status</span>
-          <span>Content hash</span>
-          <span>Extraction status</span>
+          <span>{result?.canonicalUrl ?? "Canonical URL"}</span>
+          <span>{result?.job.status ?? "Fetch status"}</span>
+          <span>{result?.candidate.id ?? "URL candidate"}</span>
+          <span>{result?.job.id ?? "Ingestion job"}</span>
         </div>
       </section>
     </main>
