@@ -4,7 +4,7 @@
 
 The source of truth is local `data/research.json`. A standard-library Python pipeline validates records and produces a browser-ready public JSON graph. Next.js reads that export. No hosted database, database credentials, authentication service, or remote storage is required.
 
-The initial dataset is empty. Adding sources is a later task. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate concerns for future adapters.
+The Swiss Parliament public web service is the first source, with a resumable multilingual importer and daily GitHub Actions refresh. Imported memberships require review before publication. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
 
 The exact implemented contract is documented in [data-format.md](data-format.md).
 
@@ -38,7 +38,7 @@ The exact implemented contract is documented in [data-format.md](data-format.md)
 - Interactive network visualization, search, graph filters, entity details, and timelines.
 - Scheduled refreshes once actual sources and refresh needs are known.
 
-Future fetchers must respect access controls, paywalls, rate limits, and source-specific publication rules. The current pipeline performs no fetching. Do not introduce infrastructure for these later features before it is needed.
+Fetchers must respect access controls, paywalls, rate limits, and source-specific publication rules. The build is offline; explicit source imports perform fetching separately. Do not introduce infrastructure for later features before it is needed.
 
 ## Acceptance checks for this version
 

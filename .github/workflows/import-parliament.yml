@@ -1,0 +1,89 @@
+name: Import Swiss Parliament
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: parliament-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test the pipeline
+        run: python -m unittest discover -s tests/pipeline -v
+
+      - name: Restore previous archive checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw/parliament
+          key: parliament-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            parliament-v1-
+
+      - name: Import all four languages and normalize candidates
+        run: python import_parliament.py --refresh --languages de fr it en --workers 4 --interval 0.2 --max-seconds 14400
+
+      - name: Build reviewed public data
+        run: python build_data_pipeline.py
+
+      - name: Save archive checkpoint
+        if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/parliament
+          key: parliament-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload import archive and reports
+        if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: parliament-import-${{ github.run_id }}
+          retention-days: 7
+          compression-level: 0
+          path: |
+            data/raw/parliament
+            data/imports/parliament
+
+      - name: Summarize coverage
+        if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("data/raw/parliament/manifest.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"## Parliament import: {report['status']}\n\n")
+              summary.write(f"Languages: {', '.join(report['languages'])}\n\n")
+              summary.write("Paused means the next daily run resumes the initial archive; it does not mean all records were imported.\n\n")
+              summary.write("| Collection | Records | Listing complete |\n| --- | ---: | --- |\n")
+              for name, item in report['collections'].items():
+                  summary.write(f"| {name} | {item['records']} | {item['complete']} |\n")
+              summary.write("\n| Details | Imported | Discovered |\n| --- | ---: | ---: |\n")
+              for name, item in report['details'].items():
+                  summary.write(f"| {name} | {item['completed']} | {item['total']} |\n")
+              for error in report['errors']:
+                  summary.write(f"\n- {error}\n")
+          PY
+
+      - name: Continue an unfinished initial archive
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python -c "import json; from pathlib import Path; r=json.loads(Path('data/raw/parliament/manifest.json').read_text()); raise SystemExit(0 if r['status']=='paused' and r['downloaded_requests']>0 else 1)"; then
+            gh workflow run import-parliament.yml --ref main
+          fi

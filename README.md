@@ -27,7 +27,7 @@ data/research.json → Python validation and projection → public/data/graph.js
 - `public/data/graph.json` is generated and checked in. Do not edit it directly.
 - Optional raw files belong in ignored `data/raw/`, outside the web root. Full document text, review metadata, and internal notes are never copied into the public export. Files committed to a public repository are still public; this export boundary is not repository access control.
 
-The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). It does not fetch remote sources. Source adapters, crawling, LLM extraction, and a review UI can be added later.
+The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions and produces unverified research candidates. GitHub Actions runs the import daily and saves resumable checkpoints and downloadable data artifacts.
 
 ## Commands
 
@@ -36,6 +36,7 @@ python build_data_pipeline.py                         # Validate and atomically 
 python build_data_pipeline.py --check                 # Validate and detect stale exports; no writes
 python build_data_pipeline.py --input path/to/research.json --output path/to/graph.json
 pnpm test:pipeline                                   # Python standard-library tests
+pnpm data:import:parliament                           # Import/refresh all Parliament records
 pnpm test                                            # Frontend data-contract tests
 pnpm typecheck
 pnpm lint

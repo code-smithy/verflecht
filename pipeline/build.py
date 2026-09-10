@@ -208,10 +208,26 @@ def unique_keys(pairs):
     return result
 
 
-def build(input_path, output_path, check=False):
+def merge_research(authored, imported):
+    """Combine local imports, with explicit authored records taking precedence."""
+    merged = {"schema_version": 1}
+    for dataset in [*imported, authored]:
+        require(dataset.get("schema_version") == 1, "import schema_version must be 1")
+    for key in ("sources", "documents", "entities", "claims"):
+        rows = {}
+        for dataset in [*imported, authored]:
+            rows.update(collection(dataset, key))
+        merged[key] = [rows[identifier] for identifier in sorted(rows)]
+    return merged
+
+
+def build(input_path, output_path, check=False, import_paths=()):
     input_path, output_path = Path(input_path).resolve(), Path(output_path).resolve()
     require(input_path != output_path, "input and output paths must differ")
     dataset = json.loads(input_path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_keys)
+    if import_paths:
+        imports = [json.loads(Path(path).read_text(encoding="utf-8-sig"), object_pairs_hook=unique_keys) for path in import_paths]
+        dataset = merge_research(dataset, imports)
     graph = project(dataset)
     serialized = json.dumps(graph, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     if check:

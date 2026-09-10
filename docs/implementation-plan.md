@@ -26,4 +26,4 @@
 - Add graph interaction, search, filters, and timelines over the same public JSON contract.
 - Add stronger history enforcement and concurrent editing only if the local workflow requires them.
 
-No source integrations, remote refresh jobs, LLM providers, or multi-user services are configured in this version.
+The Swiss Parliament adapter now archives the legacy API in all four languages, resumes interrupted imports, refreshes changed records, and runs daily in GitHub Actions. See [the importer documentation](parliament-import.md). LLM providers and multi-user services remain unconfigured.

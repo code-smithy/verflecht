@@ -4,6 +4,8 @@ coverage/
 dist/
 out/
 pnpm-lock.yaml
+data/raw/
+data/imports/
 
 # Preserve authored planning docs unless they are intentionally edited.
 docs/requirements.md

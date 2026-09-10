@@ -13,7 +13,7 @@ Required: `id`, `name`, `type`, `url`.
 | `media`        | Journalism and reporting                                                 |
 | `other`        | Other attributable material, including manual research with a source URL |
 
-These describe who published the material, not its file format, reliability score, or import mechanism. URLs must be HTTP(S), without embedded credentials. There are no crawler settings yet.
+These describe who published the material, not its file format, reliability score, or import mechanism. URLs must be HTTP(S), without embedded credentials. Source adapters have separate import settings; see [the Parliament importer](parliament-import.md).
 
 ## Documents
 
@@ -50,4 +50,4 @@ See [the fictional test fixture](../tests/fixtures/research.json) for a complete
 
 The viewer reads `/data/graph.json` and validates its shape. There is no database or server API. Source/document text and review details stay in the authoring file. Output uses explicit field allowlists; adding internal fields does not make them public. Collection ordering is stable by ID. Builds use an atomic replacement after validation, and `--check` compares the expected bytes with the committed export.
 
-Future source importers should write local candidates in this format with `PENDING_REVIEW`, then run the same build. Keep network fetching separate from the offline build. Nothing in this version calls remote sources or an LLM.
+Source importers write local candidates in this format with `PENDING_REVIEW`, then run the same build. Network fetching stays separate from the offline build. The default build merges generated `data/imports/*/research.json` files and gives authored records precedence. [The Parliament importer](parliament-import.md) is implemented; no LLM is called.

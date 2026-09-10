@@ -13,9 +13,11 @@ def main():
     parser.add_argument("--input", type=Path, default=ROOT / "data/research.json")
     parser.add_argument("--output", type=Path, default=ROOT / "public/data/graph.json")
     parser.add_argument("--check", action="store_true", help="Validate and fail if the export is missing or stale; write nothing")
+    parser.add_argument("--imports-dir", type=Path, default=ROOT / "data/imports", help="Local generated imports used with the default authoring file")
     args = parser.parse_args()
     try:
-        graph = build(args.input, args.output, check=args.check)
+        imports = sorted(args.imports_dir.glob("*/research.json")) if args.input.resolve() == (ROOT / "data/research.json").resolve() else []
+        graph = build(args.input, args.output, check=args.check, import_paths=imports)
     except (ValidationError, OSError, UnicodeError, json.JSONDecodeError) as error:
         print(f"Pipeline failed: {error}", file=sys.stderr)
         return 1

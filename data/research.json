@@ -1,6 +1,13 @@
 {
   "schema_version": 1,
-  "sources": [],
+  "sources": [
+    {
+      "id": "ch-parliament",
+      "name": "Swiss Parliament — public web services",
+      "type": "official",
+      "url": "https://ws-old.parlament.ch/"
+    }
+  ],
   "documents": [],
   "entities": [],
   "claims": []
