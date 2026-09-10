@@ -3,7 +3,10 @@ import { graphSchema, loadGraph } from "../src/lib/graph";
 import graph from "./fixtures/graph.json";
 import empty from "../public/data/graph.json";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("Python export contract", () => {
   it("accepts the shared Python fixture and the initial empty export", () => {
@@ -66,5 +69,16 @@ describe("Python export contract", () => {
     await expect(loadGraph()).rejects.toThrow("could not be loaded");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
     await expect(loadGraph()).rejects.toThrow();
+  });
+
+  it("loads research under the GitHub Pages project path", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_BASE_PATH", "/verflecht");
+    const request = vi.fn().mockResolvedValue({ ok: true, json: async () => graph });
+    vi.stubGlobal("fetch", request);
+    expect(await loadGraph()).toEqual(graph);
+    expect(request).toHaveBeenCalledWith("/verflecht/data/graph.json", {
+      cache: "no-store",
+      signal: undefined,
+    });
   });
 });

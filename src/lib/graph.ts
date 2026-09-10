@@ -73,7 +73,8 @@ export const graphSchema = z
 export type Graph = z.infer<typeof graphSchema>;
 
 export async function loadGraph(signal?: AbortSignal): Promise<Graph> {
-  const response = await fetch("/data/graph.json", { cache: "no-store", signal });
+  const basePath = process.env.NEXT_PUBLIC_SITE_BASE_PATH ?? "";
+  const response = await fetch(`${basePath}/data/graph.json`, { cache: "no-store", signal });
   if (!response.ok) throw new Error("Research data could not be loaded. Please try again.");
   return graphSchema.parse(await response.json());
 }

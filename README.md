@@ -47,3 +47,9 @@ pnpm start
 Default data paths are relative to the repository, even when the Python command is run from another directory. Explicit paths are relative to the working directory. Invalid input exits with an error and leaves the last successful export intact. Rebuild successfully before publishing; CI rejects stale or invalid data.
 
 See [the data format](docs/data-format.md), [requirements](docs/requirements.md), and [implementation plan](docs/implementation-plan.md).
+
+## GitHub Pages
+
+The CI workflow tests and statically exports the app, then deploys successful `main` builds to [the public site](https://code-smithy.github.io/verflecht/). It can also be run manually. Pull requests only validate the build.
+
+Pages builds set `NEXT_OUTPUT=export` and `NEXT_PUBLIC_SITE_BASE_PATH=/verflecht` so scripts and research JSON load under the repository path. Normal local development needs neither variable. The deployed app has no login, account service, or authenticated routes.
