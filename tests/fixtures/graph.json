@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "nodes": [
+    {
+      "id": "organisation-1",
+      "name": "Example Organisation",
+      "type": "ORGANISATION"
+    },
+    {
+      "id": "person-1",
+      "name": "Example Person",
+      "type": "PERSON"
+    }
+  ],
+  "edges": [
+    {
+      "id": "claim-1",
+      "subject_id": "person-1",
+      "object_id": "organisation-1",
+      "predicate": "MEMBER_OF",
+      "connection_class": "DIRECT",
+      "valid_from": null,
+      "valid_to": null,
+      "evidence": [
+        {
+          "text": "Example Person is a member of Example Organisation.",
+          "document": {
+            "id": "document-1",
+            "title": "Example membership list",
+            "url": "https://example.org/members",
+            "source_id": "source-1",
+            "content_hash": "c2468f9fbef30bf7b0b88bbf2396aee49469f8896b30194be2ee2d4ff70424ee"
+          },
+          "source": {
+            "id": "source-1",
+            "name": "Example register",
+            "type": "official",
+            "url": "https://example.org"
+          }
+        }
+      ]
+    }
+  ]
+}

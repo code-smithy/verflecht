@@ -8,6 +8,11 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "data:build": "python build_data_pipeline.py",
+    "data:check": "python build_data_pipeline.py --check",
+    "test:pipeline": "python -m unittest discover -s tests/pipeline -v",
+    "predev": "pnpm data:build",
+    "prebuild": "pnpm data:build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -19,7 +24,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.55.0",
     "next": "^15.4.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

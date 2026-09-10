@@ -26,3 +26,9 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Python and raw research working files
+__pycache__/
+*.py[cod]
+.venv/
+data/raw/

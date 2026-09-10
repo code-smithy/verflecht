@@ -1,0 +1,52 @@
+{
+  "source_types": ["official", "organisation", "media", "other"],
+  "entity_types": [
+    "PERSON",
+    "ORGANISATION",
+    "COMPANY",
+    "POLITICAL_PARTY",
+    "COMMITTEE",
+    "PARLIAMENT",
+    "GOVERNMENT_BODY",
+    "EVENT",
+    "INITIATIVE",
+    "ASSOCIATION",
+    "MEDIA_OUTLET",
+    "LOCATION",
+    "COUNTRY",
+    "OTHER"
+  ],
+  "predicates": [
+    "MEMBER_OF",
+    "PRESIDENT_OF",
+    "VICE_PRESIDENT_OF",
+    "BOARD_MEMBER_OF",
+    "EMPLOYED_BY",
+    "OWNS",
+    "SHAREHOLDER_OF",
+    "HAS_MANDATE_AT",
+    "MEMBER_OF_COMMITTEE",
+    "PARTICIPATED_IN",
+    "ORGANISED_BY",
+    "SPOKE_AT",
+    "MET_WITH",
+    "REPRESENTED",
+    "FUNDED_BY",
+    "SUPPORTED_INITIATIVE",
+    "SIGNED_DECLARATION",
+    "HAS_BUSINESS_ACTIVITY_IN",
+    "ISSUED_ACCESS_BADGE_TO",
+    "ADVISOR_TO",
+    "FOUNDED",
+    "PARTNER_OF"
+  ],
+  "connection_classes": ["DIRECT", "INDIRECT", "OFFICIAL", "HISTORICAL"],
+  "verification_statuses": [
+    "DETECTED",
+    "PENDING_REVIEW",
+    "VERIFIED",
+    "REJECTED",
+    "DISPUTED",
+    "OUTDATED"
+  ]
+}

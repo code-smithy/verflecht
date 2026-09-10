@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "source-1",
+      "name": "Example register",
+      "type": "official",
+      "url": "https://example.org",
+      "notes": "internal source note"
+    }
+  ],
+  "documents": [
+    {
+      "id": "document-1",
+      "source_id": "source-1",
+      "title": "Example membership list",
+      "url": "https://example.org/members",
+      "text": "Example Person is a member of Example Organisation. Unpublished context."
+    }
+  ],
+  "entities": [
+    {
+      "id": "person-1",
+      "name": "Example Person",
+      "type": "PERSON",
+      "notes": "internal entity note"
+    },
+    { "id": "organisation-1", "name": "Example Organisation", "type": "ORGANISATION" },
+    { "id": "private-person", "name": "Unpublished Person", "type": "PERSON" }
+  ],
+  "claims": [
+    {
+      "id": "claim-1",
+      "subject_id": "person-1",
+      "object_id": "organisation-1",
+      "predicate": "MEMBER_OF",
+      "connection_class": "DIRECT",
+      "status": "VERIFIED",
+      "reviewed_by": "fixture-reviewer",
+      "reviewed_at": "2026-09-10T12:00:00Z",
+      "notes": "internal claim note",
+      "evidence": [
+        {
+          "document_id": "document-1",
+          "text": "Example Person is a member of Example Organisation."
+        }
+      ]
+    }
+  ]
+}

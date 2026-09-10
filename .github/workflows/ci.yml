@@ -28,6 +28,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test pipeline
+        run: pnpm test:pipeline
+
+      - name: Check generated data
+        run: pnpm data:check
+
       - name: Lint
         run: pnpm lint
 
@@ -39,3 +50,6 @@ jobs:
 
       - name: Check formatting
         run: pnpm format
+
+      - name: Build
+        run: pnpm build
