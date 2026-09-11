@@ -6,7 +6,7 @@ The source of truth is local `data/research.json`. Python import scripts collect
 
 The application must remain login-free and must not depend on Supabase, a hosted database, database credentials, an authentication service, or remote application storage. GitHub Actions may retain pipeline checkpoints and artifacts, but it is not an application backend.
 
-The Swiss Parliament public web service is the first source, with a resumable multilingual importer that runs once per night in GitHub Actions. Explicit council and committee memberships from this official source are published automatically with machine-verification provenance. Other imported or inferred relationships still require review. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
+The Swiss Parliament public web service is the first source, with a resumable multilingual importer that runs once per night in GitHub Actions. Explicit council and committee memberships and active-member party/faction affiliations from this official source are published automatically with machine-verification provenance. Other imported or inferred relationships still require review. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
 
 The exact implemented contract is documented in [data-format.md](data-format.md).
 

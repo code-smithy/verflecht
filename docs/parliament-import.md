@@ -1,5 +1,13 @@
 # Swiss Parliament import
 
+## Party and faction affiliations
+
+The normaliser also publishes `MEMBER_OF` links from active councillors to their explicitly identified party and faction. It uses `partyId`/`partyName` and `factionId`/`factionName` from the German detail response. IDs match the party and faction catalogue entities; translations do not create duplicate links.
+
+These are source snapshots, not membership histories. Both validity dates remain unknown. Inactive members, missing IDs, and missing names do not produce these links. The evidence contains the member ID, active flag, and exact affiliation fields. Free text, motions, and votes remain excluded. Each successful normalisation rebuilds the snapshot, so removed affiliations are not retained as current facts.
+
+Run `python import_parliament.py --normalize-only` against an existing archive to generate the new links without downloading the archive again. The nightly import runs normalisation automatically. The automatic-publication scope described below now also includes these active-member party/faction links.
+
 The source is [the Swiss Parliament's public web service](https://ws-old.parlament.ch/). The importer uses the documented JSON format, `lang` parameter, and `pageNumber` pagination. It identifies itself as Verflecht and sends `Accept: text/json`; requests without the documented format header may be rejected by the service.
 
 ## Scope
@@ -42,14 +50,14 @@ The default rate is at most five request starts per second across four workers, 
 - `data/raw/parliament/responses/`: compressed JSON envelopes containing the exact decoded API body, URL, language, retrieval time, and SHA-256 checksum. Raw history is retained under `versions/` when a response changes.
 - `data/raw/parliament/manifest.json`: progress, collection counts, detail totals, and errors. Counts refer to each language/view and can include the same underlying record in multiple views.
 - `data/raw/parliament/catalog.json`: detail request inventory after listing discovery.
-- `data/imports/parliament/research.json`: normalized entities and explicit council/committee membership candidates.
+- `data/imports/parliament/research.json`: normalized entities, council/committee memberships, and active-member party/faction affiliations.
 - `data/imports/parliament/normalization-report.json`: normalization counts and skipped membership records.
 
-The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection currently maps people, institutions, and explicit council/committee memberships. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, or free-text disclosures. German membership excerpts supply evidence; entity names retain translations.
+The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection currently maps people, institutions, council/committee memberships, and active-member party/faction affiliations. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, or free-text disclosures. German membership excerpts supply evidence; entity names retain translations.
 
-Explicit council and committee memberships returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. This exception applies only to direct structured membership records. Votes, free text, co-mentions, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
+Explicit council and committee memberships and active-member party/faction affiliations returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. This exception applies only to direct structured membership records. Votes, free text, co-mentions, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
 
-Raw archives and generated imports are ignored by Git and excluded from the website. They may include publicly returned contact information; only explicitly selected evidence fields can enter the public graph.
+Raw archives are ignored by Git and excluded from the website; normalised imports are committed. They may include publicly returned contact information; only explicitly selected evidence fields can enter the public graph.
 
 ## GitHub Actions
 
@@ -66,4 +74,4 @@ Each run:
 7. Commits the full normalised dataset and generated public graph when they change, then dispatches the Pages CI workflow.
 8. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches an import continuation.
 
-A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job does not commit bulk data or change the public site's review policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
+A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job commits normalised data, not the raw archive, under the public site's publication policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.

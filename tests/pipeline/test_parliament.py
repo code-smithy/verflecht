@@ -129,6 +129,63 @@ class ParliamentTests(unittest.TestCase):
             with self.assertRaises(BudgetReached):
                 client.fetch("councillors", "de", 1)
 
+    def test_active_party_and_faction_affiliations(self):
+        person = {"id": 1, "firstName": "Example", "lastName": "Person", "active": True,
+                  "partyId": 12, "partyName": "Example Party",
+                  "factionId": 2, "factionName": "Example Faction"}
+        for changes, expected in (({}, 2), ({"active": False}, 0),
+                                  ({"active": None}, 0), ({"partyId": None}, 1),
+                                  ({"partyId": True}, 1), ({"partyId": 0}, 1),
+                                  ({"factionName": ""}, 1)):
+            with self.subTest(changes=changes), tempfile.TemporaryDirectory() as directory:
+                responses = {}
+                for language in ("de", "fr"):
+                    responses[request_url("councillors", language, 1)] = [{"id": 1}]
+                    responses[request_url("councillors/1", language)] = {**person, **changes}
+                import_archive(directory, ["de", "fr"], resources=(Resource("councillors", "councillors"),), client=self.client(directory, responses))
+                output = Path(directory) / "normalized/research.json"
+                report = materialize(directory, output)
+                dataset = json.loads(output.read_text(encoding="utf-8"))
+                self.assertEqual(report["verified_claims"], expected)
+                self.assertEqual(len(project(dataset)["edges"]), expected)
+                for claim in dataset["claims"]:
+                    self.assertEqual(claim["predicate"], "MEMBER_OF")
+                    self.assertIsNone(claim["valid_from"])
+                    self.assertIsNone(claim["valid_to"])
+                    self.assertEqual(claim["connection_class"], "OFFICIAL")
+                    self.assertIn(claim["object_id"], ("parliament:political_party:12", "parliament:organisation:factions:2"))
+                original = output.read_bytes()
+                materialize(directory, output)
+                self.assertEqual(original, output.read_bytes())
+
+    def test_affiliation_refresh_removes_old_links_and_reuses_catalog_ids(self):
+        resources = (Resource("councillors", "councillors"), Resource("parties/historic"), Resource("factions"))
+        responses = {
+            request_url("councillors", "de", 1): [{"id": 1, "updated": "first"}],
+            request_url("councillors/1", "de"): {
+                "id": 1, "active": True, "partyId": 12, "partyName": "Party",
+                "factionId": 2, "factionName": "Faction"},
+            request_url("parties/historic", "de", 1): [{"id": 12, "name": "Party"}],
+            request_url("factions", "de", 1): [{"id": 2, "name": "Faction"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "normalized/research.json"
+            import_archive(directory, ["de"], resources=resources, client=self.client(directory, responses))
+            materialize(directory, output)
+            first = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(len(first["entities"]), 3)
+            self.assertEqual(len(first["claims"]), 2)
+            for claim in first["claims"]:
+                document = next(doc for doc in first["documents"] if doc["id"] == claim["evidence"][0]["document_id"])
+                self.assertIn(claim["evidence"][0]["text"], document["text"])
+            responses[request_url("councillors", "de", 1)][0]["updated"] = "second"
+            responses[request_url("councillors/1", "de")]["active"] = False
+            import_archive(directory, ["de"], resources=resources, client=self.client(directory, responses), refresh=True)
+            materialize(directory, output)
+            current = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(current["claims"], [])
+            self.assertEqual(project(current)["edges"], [])
+
     def test_normalization_publishes_explicit_official_facts_and_authored_overrides(self):
         person = {"id": 1, "firstName": "Example", "lastName": "Person", "concerns": [{"name": "Not an inferred affiliation"}],
                   "councilMemberships": [{"id": 0, "entryDate": "2000-01-01T00:00:00Z", "leavingDate": "2004-01-01T00:00:00Z", "council": {"id": 1, "name": "Nationalrat"}}]}
