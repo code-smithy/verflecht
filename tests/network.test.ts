@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/graph.json";
 import { graphSchema } from "../src/lib/graph";
-import { filterNetwork, networkWindow } from "../src/lib/network";
+import { connectedWithin, filterNetwork, networkWindow } from "../src/lib/network";
 
 const graph = graphSchema.parse(fixture);
 describe("network explorer", () => {
@@ -75,5 +75,28 @@ describe("network explorer", () => {
     expect(limited.nodes).toHaveLength(1);
     expect(limited.edges).toHaveLength(0);
     expect(graph.edges).toHaveLength(1);
+  });
+  it("finds entities within a configurable number of connections", () => {
+    const third = { ...graph.nodes[0], id: "organisation-2", name: "Second Organisation" };
+    const chain = graphSchema.parse({
+      ...graph,
+      nodes: [...graph.nodes, third],
+      edges: [
+        ...graph.edges,
+        {
+          ...graph.edges[0],
+          id: "claim-2",
+          subject_id: graph.nodes[0].id,
+          object_id: third.id,
+        },
+      ],
+    });
+    expect([...connectedWithin(chain, graph.nodes[1].id, 1)]).toEqual([
+      graph.nodes[1].id,
+      graph.nodes[0].id,
+    ]);
+    expect(connectedWithin(chain, graph.nodes[1].id, 2)).toEqual(
+      new Set([graph.nodes[1].id, graph.nodes[0].id, third.id]),
+    );
   });
 });

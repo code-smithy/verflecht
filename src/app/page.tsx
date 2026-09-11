@@ -14,6 +14,7 @@ export default function Home() {
   const [attempt, setAttempt] = useState(0);
   const [filters, setFilters] = useState(defaults);
   const [selected, setSelected] = useState<string | null>(null);
+  const [focusDistance, setFocusDistance] = useState(1);
   const [page, setPage] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
@@ -122,12 +123,34 @@ export default function Home() {
             <section className="network-panel" aria-label="Network graph">
               <div className="panel-bar">
                 <h2>Network</h2>
-                <span className="live-layout">Live force layout</span>
+                <div className="graph-heading-tools">
+                  <label className="focus-distance">
+                    Fade after
+                    <input
+                      type="number"
+                      min="1"
+                      max="6"
+                      value={focusDistance}
+                      disabled={!selected}
+                      aria-label="Connection distance"
+                      onChange={(event) =>
+                        setFocusDistance(Math.max(1, Math.min(6, Number(event.target.value) || 1)))
+                      }
+                    />
+                    connections
+                  </label>
+                  <span className="live-layout">Live force layout</span>
+                </div>
               </div>
               {!visible?.nodes.length ? (
                 <p className="state">No relationships match these filters.</p>
               ) : (
-                <ForceGraph graph={visible} selected={selected} onSelect={select} />
+                <ForceGraph
+                  graph={visible}
+                  selected={selected}
+                  focusDistance={focusDistance}
+                  onSelect={select}
+                />
               )}
               <p className="legend">
                 <span>● People</span>

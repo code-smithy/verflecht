@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Graph } from "@/lib/graph";
+import { connectedWithin } from "@/lib/network";
 
 type Props = {
   graph: Graph;
   selected: string | null;
+  focusDistance: number;
   onSelect: (id: string) => void;
 };
 
@@ -29,20 +31,27 @@ const hash = (value: string) => {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-export default function ForceGraph({ graph, selected, onSelect }: Props) {
+export default function ForceGraph({ graph, selected, focusDistance, onSelect }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<SimNode[]>([]);
   const viewRef = useRef<View>({ x: 0, y: 0, scale: 1 });
   const selectedRef = useRef(selected);
+  const focusedRef = useRef<Set<string> | null>(null);
   const hoveredRef = useRef<string | null>(null);
   const drawRef = useRef<() => void>(() => undefined);
   const [zoom, setZoom] = useState(100);
 
+  const focused = useMemo(
+    () => (selected ? connectedWithin(graph, selected, focusDistance) : null),
+    [focusDistance, graph, selected],
+  );
+
   useEffect(() => {
     selectedRef.current = selected;
+    focusedRef.current = focused;
     drawRef.current();
-  }, [selected]);
+  }, [focused, selected]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,15 +107,21 @@ export default function ForceGraph({ graph, selected, onSelect }: Props) {
       context.scale(view.scale, view.scale);
 
       const active = selectedRef.current;
+      const focusedIds = focusedRef.current;
       context.lineWidth = 0.85 / view.scale;
       for (const link of links) {
-        const connected = active && (link.source.id === active || link.target.id === active);
-        context.strokeStyle = connected
+        const directlyConnected =
+          active && (link.source.id === active || link.target.id === active);
+        const inFocus =
+          !focusedIds || (focusedIds.has(link.source.id) && focusedIds.has(link.target.id));
+        context.strokeStyle = directlyConnected
           ? "rgba(28, 106, 171, .9)"
-          : active
-            ? "rgba(145, 164, 180, .10)"
+          : focusedIds
+            ? inFocus
+              ? "rgba(86, 125, 157, .38)"
+              : "rgba(145, 164, 180, .045)"
             : "rgba(123, 149, 170, .27)";
-        context.lineWidth = (connected ? 2.2 : 0.85) / view.scale;
+        context.lineWidth = (directlyConnected ? 2.2 : inFocus ? 0.95 : 0.7) / view.scale;
         context.beginPath();
         context.moveTo(link.source.x, link.source.y);
         context.lineTo(link.target.x, link.target.y);
@@ -116,6 +131,8 @@ export default function ForceGraph({ graph, selected, onSelect }: Props) {
       const labelScale = clamp(1 / view.scale, 0.75, 1.4);
       for (const node of nodes) {
         const isSelected = node.id === active;
+        const isFaded = Boolean(focusedIds && !focusedIds.has(node.id));
+        context.globalAlpha = isFaded ? 0.13 : 1;
         context.beginPath();
         context.arc(node.x, node.y, node.radius + (isSelected ? 3 : 0), 0, Math.PI * 2);
         context.fillStyle = node.type === "PERSON" ? "#1769aa" : "#b55227";
@@ -124,6 +141,7 @@ export default function ForceGraph({ graph, selected, onSelect }: Props) {
         context.strokeStyle = isSelected ? "#132433" : "#ffffff";
         context.stroke();
       }
+      context.globalAlpha = 1;
 
       const occupied: Array<{ left: number; right: number; top: number; bottom: number }> = [];
       const labelNodes = [...nodes].sort(
@@ -134,6 +152,9 @@ export default function ForceGraph({ graph, selected, onSelect }: Props) {
       for (const node of labelNodes) {
         const isSelected = node.id === active;
         const isHovered = node.id === hoveredRef.current;
+        const isFaded = Boolean(focusedIds && !focusedIds.has(node.id));
+        if (isFaded && !isHovered) continue;
+        context.globalAlpha = isFaded ? 0.35 : 1;
         const fontSize = 11 * labelScale;
         context.font = `${isSelected || isHovered ? 700 : 550} ${fontSize}px Arial, Helvetica, sans-serif`;
         context.textAlign = "center";
@@ -162,6 +183,7 @@ export default function ForceGraph({ graph, selected, onSelect }: Props) {
         context.strokeText(name, node.x, labelY);
         context.fillText(name, node.x, labelY);
       }
+      context.globalAlpha = 1;
       context.restore();
     };
     drawRef.current = draw;

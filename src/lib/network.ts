@@ -59,3 +59,27 @@ export function networkWindow(graph: Graph, limit = 360, edgeLimit = 4500): Grap
       .slice(0, edgeLimit),
   };
 }
+
+export function connectedWithin(graph: Graph, startId: string, maxDistance: number): Set<string> {
+  if (!graph.nodes.some((node) => node.id === startId)) return new Set();
+  const adjacency = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    adjacency.set(edge.subject_id, [...(adjacency.get(edge.subject_id) ?? []), edge.object_id]);
+    adjacency.set(edge.object_id, [...(adjacency.get(edge.object_id) ?? []), edge.subject_id]);
+  }
+  const seen = new Set([startId]);
+  let frontier = [startId];
+  for (let distance = 0; distance < Math.max(0, Math.floor(maxDistance)); distance += 1) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const neighbour of adjacency.get(id) ?? []) {
+        if (seen.has(neighbour)) continue;
+        seen.add(neighbour);
+        next.push(neighbour);
+      }
+    }
+    if (!next.length) break;
+    frontier = next;
+  }
+  return seen;
+}

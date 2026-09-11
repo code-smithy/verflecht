@@ -141,6 +141,31 @@ button:disabled {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.graph-heading-tools,
+.focus-distance {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.graph-heading-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.focus-distance {
+  grid-template-columns: auto 52px auto;
+  color: #526477;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.focus-distance input {
+  width: 52px;
+  min-width: 52px;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+.focus-distance input:disabled {
+  opacity: 0.5;
+}
 .force-graph {
   position: relative;
   height: 640px;
