@@ -1,8 +1,8 @@
 # Implementation plan
 
-## Implemented: local backend foundation
+## Implemented: login-free file pipeline
 
-- Replace the hosted database dependency and configuration with `data/research.json`.
+- Replace Supabase, hosted database configuration, authentication, and login flows with `data/research.json` and generated local files.
 - Keep a shared controlled vocabulary in `data/ontology.json`; simplify source types to four publisher categories.
 - Add `python build_data_pipeline.py`: offline validation, evidence matching, review requirements, supersession checks, and deterministic atomic public export.
 - Separate authored research from `public/data/graph.json` through explicit field projection.
@@ -11,12 +11,13 @@
 - Add Python tests and a shared export fixture checked by the TypeScript consumer; enforce data freshness in CI.
 - Document local authoring, review, correction, rebuild, and deployment commands.
 
-## Next: add sources when selected
+## Next: enforce nightly collection
 
-1. Choose the first actual source and capture representative local fixtures.
-2. Implement a small Python adapter that produces candidate records, preserving source URLs and document versions.
-3. Keep source refresh explicit and separate from offline rebuilding.
-4. Test unchanged imports, changed versions, and failure recovery before adding scheduled execution.
+1. Remove the Parliament workflow's immediate self-dispatch continuation.
+2. Keep the existing four-hour bound, checkpoint restore/save, and failure handling.
+3. Resume an incomplete initial archive only when the next nightly schedule starts.
+4. Verify that manual dispatch still performs exactly one bounded run.
+5. Add further source-specific Python adapters behind the same nightly, checkpointed operating model.
 
 ## Later: research workflow and viewer
 
@@ -26,4 +27,4 @@
 - Add graph interaction, search, filters, and timelines over the same public JSON contract.
 - Add stronger history enforcement and concurrent editing only if the local workflow requires them.
 
-The Swiss Parliament adapter now archives the legacy API in all four languages, resumes interrupted imports, refreshes changed records, and runs daily in GitHub Actions. See [the importer documentation](parliament-import.md). LLM providers and multi-user services remain unconfigured.
+The Swiss Parliament adapter now archives the legacy API in all four languages, resumes interrupted imports, and refreshes changed records. Its workflow has a nightly schedule, but currently self-dispatches continuation runs while the initial archive is incomplete. Removing that continuation is the next implementation step so actual execution matches the nightly-only design. See [the importer documentation](parliament-import.md). Supabase, login, LLM providers, and multi-user services are intentionally absent.
