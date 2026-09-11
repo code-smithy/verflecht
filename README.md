@@ -1,6 +1,6 @@
 # Verflecht
 
-The Parliament normaliser also publishes explicit affair authorship and individual co-signatures from cached official records. It excludes inferred authors, vote similarity, and unverified topic mappings. See [the import documentation](docs/parliament-import.md).
+The Parliament normaliser also publishes explicit affair authorship, individual co-signatures, catalogued topics, and responsible departments from cached official records. It excludes inferred authors, vote similarity, free-text indexing, and unverified topic mappings. See [the import documentation](docs/parliament-import.md).
 
 Source-backed political network research with Python ingestion and projection pipelines and a login-free Next.js viewer. The application deliberately uses no Supabase database, Supabase Storage, authentication service, or login. Source imports fetch data in scheduled Python jobs; the deterministic projection build itself remains offline.
 
@@ -29,7 +29,7 @@ data/research.json → Python validation and projection → public/data/graph.js
 - `public/data/graph.json` is generated and checked in. Do not edit it directly.
 - Optional raw files belong in ignored `data/raw/`, outside the web root. Full document text, review metadata, and internal notes are never copied into the public export. Files committed to a public repository are still public; this export boundary is not repository access control.
 
-The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions. It automatically publishes explicit council and committee memberships plus active-member party/faction affiliations returned by the official API. It does not infer relationships from votes, text, or co-occurrence.
+The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions. It automatically publishes explicit council and committee memberships, active-member party/faction affiliations, affair authorship, catalogued affair topics, and leading departments returned by the official API. It does not infer relationships from votes, text, or co-occurrence.
 
 The importer runs once per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, commits the full normalised dataset and public graph, and stops. If the initial Parliament archive is incomplete, the next nightly run resumes it. A data change triggers the Pages build.
 

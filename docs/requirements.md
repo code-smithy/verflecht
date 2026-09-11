@@ -1,6 +1,6 @@
 # Political Network Research Platform — Requirements
 
-The Parliament normaliser also publishes explicit affair authorship and individual co-signatures from cached official records. It excludes inferred authors, vote similarity, and unverified topic mappings. See [the import documentation](parliament-import.md).
+The Parliament normaliser also publishes explicit affair authorship, individual co-signatures, catalogued topics, and responsible departments from cached official records. It excludes inferred authors, vote similarity, free-text indexing, and unverified topic mappings. See [the import documentation](parliament-import.md).
 
 ## Current architecture
 

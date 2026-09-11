@@ -6,7 +6,13 @@ The normaliser reads cached `affairs/{id}` details discovered in the `affairs` l
 
 German details provide evidence. Translated titles are retained without duplicate links. Missing detail responses are skipped until a later import downloads them; malformed author identities are counted in `skipped_affairs`. The report includes `affair_detail_responses`, `authorship_claims`, and `cosignatory_claims`. Rebuilding replaces removed source roles. Authorship dates remain unknown; the filing date is not treated as a membership period.
 
-This extends automatic publication beyond the memberships described below. Votes and topic/indexing-code mappings remain outside this release. No new network requests or workflow changes are required: the nightly job normalises the available archive and publishes its graph. The viewer's relationship filter includes the new predicates when data is present.
+This extends automatic publication beyond the memberships described below. Votes remain outside this release. No new network requests are required: the nightly job normalises the available archive and publishes its graph. The viewer's relationship filter includes the new predicates when data is present.
+
+## Topics and responsible departments
+
+The normaliser publishes `HAS_TOPIC` links only when a semicolon-separated `additionalIndexing` token exactly matches a code in the official `affairs/topics` catalogue. Older free-text indexing and unknown codes remain in the raw archive and do not create relationships. Topic entities retain their translated catalogue names.
+
+An affair receives a `RESPONSIBLE_DEPARTMENT` link for each structured `drafts[].relatedDepartments[]` record explicitly marked `leading: true`. Other related departments are retained in the raw response but are not promoted to responsible departments. Repeated topic codes and leading departments are deduplicated. German affair details provide claim evidence; relationship dates remain unknown.
 
 ## Party and faction affiliations
 
@@ -65,9 +71,9 @@ Normalized research and the public graph use size-bounded JSON storage. Exports 
 
 Keep each manifest together with its parts when copying or downloading normalized data. Python consumers can use `pipeline.json_store.read_dataset(path)` to read either format. A successful rebuild removes obsolete generated parts. Chunking addresses GitHub's per-file limit; the browser still loads the complete graph, so total download size and browser memory remain proportional to the dataset.
 
-The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection currently maps people, institutions, council/committee memberships, and active-member party/faction affiliations. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, or free-text disclosures. German membership excerpts supply evidence; entity names retain translations.
+The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection maps people, institutions, council/committee memberships, active-member party/faction affiliations, affair authorship, catalogued topics, and explicitly leading departments. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, free-text indexing, or free-text disclosures. German excerpts supply evidence; entity names retain translations.
 
-Explicit council and committee memberships and active-member party/faction affiliations returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. This exception applies only to direct structured membership records. Votes, free text, co-mentions, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
+Explicit council and committee memberships, active-member party/faction affiliations, affair author roles, catalogue-matched topic codes, and leading departments returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. Votes, free text, co-mentions, unknown indexing values, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
 
 Raw archives are ignored by Git and excluded from the website; normalised imports are committed. They may include publicly returned contact information; only explicitly selected evidence fields can enter the public graph.
 

@@ -193,6 +193,43 @@ class ParliamentTests(unittest.TestCase):
             self.assertEqual(state["status"], "complete")
             resumed.download.assert_not_called()
 
+    def test_affair_topics_and_responsible_departments_are_explicit(self):
+        responses = {
+            request_url("affairs", "de", 1): [{"id": 20257833}],
+            request_url("affairs/20257833", "de"): {
+                "id": 20257833, "title": "Example affair", "additionalIndexing": "55;999;free text",
+                "drafts": [{"relatedDepartments": [
+                    {"id": 4, "name": "Interior", "leading": True},
+                    {"id": 8, "name": "Economy", "leading": False},
+                    {"id": 4, "name": "Interior", "leading": True},
+                ]}],
+            },
+            request_url("affairs/topics", "de", 1): [{"id": 55, "code": "55", "name": "Agriculture"}],
+            request_url("departments", "de", 1): [{"id": 4, "name": "Interior"}, {"id": 8, "name": "Economy"}],
+        }
+        resources = (Resource("affairs", "affairs"), Resource("affairs/topics"), Resource("departments"))
+        with tempfile.TemporaryDirectory() as directory:
+            import_archive(directory, ["de"], resources=resources, client=self.client(directory, responses))
+            output = Path(directory) / "normalized/research.json"
+            report = materialize(directory, output)
+            dataset = json.loads(output.read_text(encoding="utf-8"))
+
+            self.assertEqual(report["topic_claims"], 1)
+            self.assertEqual(report["responsible_department_claims"], 1)
+            self.assertEqual(report["unmapped_topic_values"], 0)
+            self.assertEqual({claim["predicate"] for claim in dataset["claims"]},
+                             {"HAS_TOPIC", "RESPONSIBLE_DEPARTMENT"})
+            self.assertEqual({claim["object_id"] for claim in dataset["claims"]},
+                             {"parliament:topic:55", "parliament:government_body:departments:4"})
+            self.assertNotIn("parliament:government_body:departments:8",
+                             {claim["object_id"] for claim in dataset["claims"]})
+            for claim in dataset["claims"]:
+                self.assertEqual(claim["status"], "VERIFIED")
+                self.assertEqual(claim["subject_id"], "parliament:parliamentary_affair:20257833")
+                document = next(doc for doc in dataset["documents"]
+                                if doc["id"] == claim["evidence"][0]["document_id"])
+                self.assertIn(claim["evidence"][0]["text"], document["text"])
+
     def test_active_party_and_faction_affiliations(self):
         person = {"id": 1, "firstName": "Example", "lastName": "Person", "active": True,
                   "partyId": 12, "partyName": "Example Party",

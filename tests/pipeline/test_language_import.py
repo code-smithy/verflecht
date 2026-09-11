@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from pipeline.build import ValidationError, project
+from pipeline.json_store import read_dataset, write_dataset
 from pipeline.language_import import combine, configuration
 from pipeline.parliament import atomic_json
 
@@ -60,6 +61,20 @@ class LanguageImportTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 combine(results, destination)
             self.assertEqual(previous, (destination / "research.json").read_bytes())
+
+    def test_sharded_language_results_are_combined(self):
+        fixture = json.loads((Path(__file__).parents[1] / "fixtures/research.json").read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            destination, results = Path(directory) / "published", Path(directory) / "results"
+            source = results / "de/research.json"
+            write_dataset(source, fixture, max_bytes=600)
+            self.assertEqual(json.loads(source.read_text())["storage"], "json-parts-v1")
+
+            combined = combine(results, destination)
+
+            self.assertEqual(project(combined), project(fixture))
+            self.assertEqual(read_dataset(destination / "research.json"), combined)
+            self.assertEqual(read_dataset(destination / "languages/de/research.json"), fixture)
 
 
 if __name__ == "__main__":

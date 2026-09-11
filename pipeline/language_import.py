@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 from pipeline.build import project, require
+from pipeline.json_store import read_dataset, write_dataset
 from pipeline.parliament import LANGUAGES, atomic_json
 
 
@@ -21,7 +22,7 @@ def combine(results, destination):
     results, destination = Path(results), Path(destination)
     snapshots, reports = {}, {}
     legacy_path = destination / "research.json"
-    legacy = json.loads(legacy_path.read_text()) if legacy_path.exists() else None
+    legacy = read_dataset(legacy_path) if legacy_path.exists() else None
     # Seed old published data once. A partial-language run must not erase it.
     if legacy:
         project(legacy)
@@ -37,7 +38,7 @@ def combine(results, destination):
         for root in (destination / "languages", results):
             path = root / language / "research.json"
             if path.exists():
-                dataset = json.loads(path.read_text())
+                dataset = read_dataset(path)
                 project(dataset)
                 require(language == "de" or not dataset["claims"], "non-German snapshot cannot publish claims")
                 snapshots[language] = dataset
@@ -63,10 +64,10 @@ def combine(results, destination):
     project(combined)
     for language, dataset in snapshots.items():
         path = destination / "languages" / language
-        atomic_json(path / "research.json", dataset)
+        write_dataset(path / "research.json", dataset)
         if language in reports:
             atomic_json(path / "normalization-report.json", reports[language])
-    atomic_json(destination / "research.json", combined)
+    write_dataset(destination / "research.json", combined)
     atomic_json(destination / "normalization-report.json", {
         "languages": sorted(snapshots), "language_reports": reports,
         "entities": len(combined["entities"]), "verified_claims": len(combined["claims"]),
