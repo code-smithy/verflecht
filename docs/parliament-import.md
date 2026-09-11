@@ -53,7 +53,7 @@ Raw archives and generated imports are ignored by Git and excluded from the webs
 
 ## GitHub Actions
 
-The **Import Swiss Parliament** workflow runs daily at **01:17 UTC** (02:17 in Zurich in winter, 03:17 in summer). It can also be dispatched manually. GitHub may delay scheduled runs.
+The intended operating model is one **Import Swiss Parliament** run each night at **01:17 UTC** (02:17 in Zurich in winter, 03:17 in summer). It can also be dispatched manually. GitHub may delay scheduled runs. A scheduled or manual invocation must perform one bounded run, save its checkpoint, and then stop; incomplete work resumes on the next nightly invocation.
 
 Each run:
 
@@ -63,6 +63,6 @@ Each run:
 4. Validates/builds reviewed data without publishing imported candidates.
 5. Saves a new cache checkpoint and uploads the raw archive, normalized research, and coverage reports as a `parliament-import-<run ID>` artifact retained for seven days.
 6. Writes collection/detail coverage to the run summary.
-7. Dispatches a continuation when paused with new downloads, so the first archive can finish across consecutive jobs. Completed archives wait for the daily refresh. Failed runs do not dispatch a continuation.
+7. Currently dispatches a continuation when paused with new downloads. This makes the initial archive run nearly continuously in consecutive jobs. This behaviour is a known temporary deviation and must be removed; a paused archive should wait for the next nightly run. Failed runs do not dispatch a continuation.
 
-A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The daily job does not commit bulk data or change the public site's review policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
+A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job does not commit bulk data or change the public site's review policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
