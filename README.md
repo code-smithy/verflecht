@@ -1,6 +1,6 @@
 # Verflecht
 
-Source-backed political network research with an offline Python pipeline and a Next.js viewer. No database, cloud account, API keys, or Python packages are required.
+Source-backed political network research with Python ingestion and projection pipelines and a login-free Next.js viewer. The application deliberately uses no Supabase database, Supabase Storage, authentication service, or login. Source imports fetch data in scheduled Python jobs; the deterministic projection build itself remains offline.
 
 ## Quick start
 
@@ -27,7 +27,9 @@ data/research.json → Python validation and projection → public/data/graph.js
 - `public/data/graph.json` is generated and checked in. Do not edit it directly.
 - Optional raw files belong in ignored `data/raw/`, outside the web root. Full document text, review metadata, and internal notes are never copied into the public export. Files committed to a public repository are still public; this export boundary is not repository access control.
 
-The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions and produces unverified research candidates. GitHub Actions runs the import daily and saves resumable checkpoints and downloadable data artifacts.
+The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions and produces unverified research candidates.
+
+The intended operating model is one scheduled Python import run per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, and stops until the next nightly run. The current workflow still dispatches immediate continuation runs while the initial Parliament archive is incomplete, so it can run nearly continuously. This is a temporary implementation mismatch, not the target schedule.
 
 ## Commands
 
