@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import ForceGraph from "./ForceGraph";
 import { loadGraph, type Graph } from "@/lib/graph";
 import { filterNetwork, networkWindow, type Filters } from "@/lib/network";
 
-const defaults: Filters = { query: "", predicate: "", date: "" };
+const defaults: Filters = { query: "", predicate: "", date: "", includeInactive: false };
 const label = (s: string) => s.replaceAll("_", " ").toLowerCase();
 
 export default function Home() {
@@ -13,7 +14,6 @@ export default function Home() {
   const [attempt, setAttempt] = useState(0);
   const [filters, setFilters] = useState(defaults);
   const [selected, setSelected] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
   const [page, setPage] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
@@ -28,30 +28,19 @@ export default function Home() {
   const filtered = useMemo(() => (graph ? filterNetwork(graph, filters) : null), [graph, filters]);
   const visible = useMemo(() => (filtered ? networkWindow(filtered) : null), [filtered]);
   const names = useMemo(() => new Map(graph?.nodes.map((n) => [n.id, n.name])), [graph]);
-  const positions = useMemo(
-    () =>
-      new Map(
-        visible?.nodes.map((n, i) => {
-          const angle = (i / visible.nodes.length) * Math.PI * 2 - Math.PI / 2;
-          const radius = n.type === "PERSON" ? 240 : 125;
-          return [n.id, { x: 350 + Math.cos(angle) * radius, y: 300 + Math.sin(angle) * radius }];
-        }),
-      ),
-    [visible],
-  );
   const edges =
     filtered?.edges.filter(
       (e) => !selected || e.subject_id === selected || e.object_id === selected,
     ) ?? [];
-  const update = (key: keyof Filters, value: string) => {
+  const update = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
     setSelected(null);
     setPage(0);
   };
-  const select = (id: string) => {
+  const select = useCallback((id: string) => {
     setSelected(id);
     setPage(0);
-  };
+  }, []);
   return (
     <main className="explorer">
       <header className="explorer-header">
@@ -90,12 +79,19 @@ export default function Home() {
             onChange={(e) => update("date", e.target.value)}
           />
         </label>
+        <label className="checkbox-filter">
+          <input
+            type="checkbox"
+            checked={filters.includeInactive}
+            onChange={(e) => update("includeInactive", e.target.checked)}
+          />
+          Include inactive people
+        </label>
         <button
           onClick={() => {
             setFilters(defaults);
             setSelected(null);
             setPage(0);
-            setZoom(1);
           }}
         >
           Reset
@@ -119,86 +115,19 @@ export default function Home() {
         <>
           <p className="counts" role="status">
             {filtered?.nodes.length} entities · {filtered?.edges.length} relationships
+            {!filters.includeInactive ? " · Active people only" : " · Including inactive people"}
             {filters.date ? " · Unknown date bounds are included" : ""}
           </p>
           <div className="workspace">
             <section className="network-panel" aria-label="Network graph">
               <div className="panel-bar">
                 <h2>Network</h2>
-                <div>
-                  <button
-                    aria-label="Zoom out"
-                    onClick={() => setZoom((v) => Math.max(0.5, v - 0.25))}
-                  >
-                    −
-                  </button>
-                  <button onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
-                  <button
-                    aria-label="Zoom in"
-                    onClick={() => setZoom((v) => Math.min(3, v + 0.25))}
-                  >
-                    +
-                  </button>
-                </div>
+                <span className="live-layout">Live force layout</span>
               </div>
               {!visible?.nodes.length ? (
                 <p className="state">No relationships match these filters.</p>
               ) : (
-                <div className="graph-scroll">
-                  <svg
-                    viewBox="0 0 700 600"
-                    style={{ width: `${zoom * 100}%`, minWidth: 500 * zoom }}
-                    aria-label="Select an entity to inspect its evidence"
-                  >
-                    {visible.edges.map((e) => {
-                      const a = positions.get(e.subject_id)!;
-                      const b = positions.get(e.object_id)!;
-                      return (
-                        <line
-                          key={e.id}
-                          x1={a.x}
-                          y1={a.y}
-                          x2={b.x}
-                          y2={b.y}
-                          className={
-                            selected && (e.subject_id === selected || e.object_id === selected)
-                              ? "connection active"
-                              : "connection"
-                          }
-                        />
-                      );
-                    })}
-                    {visible.nodes.map((n) => {
-                      const p = positions.get(n.id)!;
-                      return (
-                        <g
-                          key={n.id}
-                          transform={`translate(${p.x},${p.y})`}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`${n.name}, ${label(n.type)}`}
-                          aria-pressed={selected === n.id}
-                          onClick={() => select(n.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              select(n.id);
-                            }
-                          }}
-                          className={`entity ${n.type === "PERSON" ? "person" : "organisation"} ${selected === n.id ? "selected" : ""}`}
-                        >
-                          <title>{n.name}</title>
-                          <circle r={selected === n.id ? 11 : 7} />
-                          {(visible.nodes.length <= 25 || selected === n.id) && (
-                            <text y={-17} textAnchor="middle">
-                              {n.name.length > 30 ? n.name.slice(0, 29) + "…" : n.name}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
+                <ForceGraph graph={visible} selected={selected} onSelect={select} />
               )}
               <p className="legend">
                 <span>● People</span>
@@ -206,8 +135,8 @@ export default function Home() {
               </p>
               <p className="graph-note">
                 Showing {visible?.nodes.length} of {filtered?.nodes.length} entities and{" "}
-                {visible?.edges.length} of {filtered?.edges.length} links. Search to narrow the
-                graph. Scroll to pan when zoomed.
+                {visible?.edges.length} of {filtered?.edges.length} links. Node size reflects the
+                number of connections. Search or use the filters to focus the graph.
               </p>
               <details>
                 <summary>Select an entity by name</summary>

@@ -10,12 +10,15 @@ describe("network explorer", () => {
       query: graph.nodes[0].name.toUpperCase(),
       predicate: "",
       date: "",
+      includeInactive: false,
     });
     expect(result.edges).toEqual(graph.edges);
     expect(result.nodes).toEqual(graph.nodes);
   });
   it("returns no results for an unknown name", () => {
-    expect(filterNetwork(graph, { query: "no match", predicate: "", date: "" }).edges).toEqual([]);
+    expect(
+      filterNetwork(graph, { query: "no match", predicate: "", date: "", includeInactive: false }),
+    ).toEqual({ schema_version: 1, nodes: [], edges: [] });
   });
   it("filters dates inclusively and relationship types exactly", () => {
     const dated = {
@@ -23,14 +26,49 @@ describe("network explorer", () => {
       edges: [{ ...graph.edges[0], valid_from: "2020-01-01", valid_to: "2021-01-01" }],
     };
     expect(
-      filterNetwork(dated, { query: "", predicate: "", date: "2021-01-01" }).edges,
+      filterNetwork(dated, {
+        query: "",
+        predicate: "",
+        date: "2021-01-01",
+        includeInactive: false,
+      }).edges,
     ).toHaveLength(1);
     expect(
-      filterNetwork(dated, { query: "", predicate: "", date: "2022-01-01" }).edges,
+      filterNetwork(dated, {
+        query: "",
+        predicate: "",
+        date: "2022-01-01",
+        includeInactive: false,
+      }).edges,
     ).toHaveLength(0);
-    expect(filterNetwork(dated, { query: "", predicate: "unknown", date: "" }).edges).toHaveLength(
-      0,
-    );
+    expect(
+      filterNetwork(dated, {
+        query: "",
+        predicate: "unknown",
+        date: "",
+        includeInactive: true,
+      }).edges,
+    ).toHaveLength(0);
+  });
+  it("hides people without a current relationship unless requested", () => {
+    const dated = {
+      ...graph,
+      edges: [{ ...graph.edges[0], valid_from: "2020-01-01", valid_to: "2021-01-01" }],
+    };
+    expect(
+      filterNetwork(
+        dated,
+        { query: "", predicate: "", date: "", includeInactive: false },
+        "2026-01-01",
+      ).nodes,
+    ).toHaveLength(0);
+    expect(
+      filterNetwork(
+        dated,
+        { query: "", predicate: "", date: "", includeInactive: true },
+        "2026-01-01",
+      ).nodes,
+    ).toHaveLength(2);
   });
   it("bounds the visual graph without creating dangling edges or changing input", () => {
     const limited = networkWindow(graph, 1);
