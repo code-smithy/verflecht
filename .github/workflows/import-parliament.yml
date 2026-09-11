@@ -4,98 +4,142 @@ on:
   schedule:
     - cron: "17 1 * * *"
   workflow_dispatch:
+    inputs:
+      language:
+        description: Language to import (nightly runs always use all)
+        type: choice
+        default: de
+        options: [de, fr, it, en, all]
+      max_seconds:
+        description: Import time budget per language (60–14400 seconds)
+        type: number
+        default: 900
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 concurrency:
-  group: parliament-import
+  group: parliament-import-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  import:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    outputs:
+      languages: ${{ steps.config.outputs.languages }}
+      max_seconds: ${{ steps.config.outputs.max_seconds }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate configuration and test pipeline
+        id: config
+        env:
+          IMPORT_LANGUAGE: ${{ inputs.language || 'all' }}
+          IMPORT_MAX_SECONDS: ${{ github.event_name == 'schedule' && '14400' || format('{0}', inputs.max_seconds) }}
+        run: |
+          python -m unittest discover -s tests/pipeline -v
+          python -m pipeline.language_import config >> "$GITHUB_OUTPUT"
 
-      - name: Test the pipeline
-        run: python -m unittest discover -s tests/pipeline -v
-
-      - name: Restore previous archive checkpoint
+  import:
+    name: Import ${{ matrix.language }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.prepare.outputs.languages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Identical runner path allows a one-time restore of the legacy cache.
+      # Each job has its own runner and thereafter its own language cache key.
+      - name: Restore language checkpoint (or legacy archive)
         uses: actions/cache/restore@v4
         with:
           path: data/raw/parliament
-          key: parliament-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          key: parliament-v2-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            parliament-v2-${{ matrix.language }}-
             parliament-v1-
-
-      - name: Import all four languages and normalize official facts
-        run: python import_parliament.py --refresh --languages de fr it en --workers 4 --interval 0.2 --max-seconds 14400
-
-      - name: Build public data
-        run: python build_data_pipeline.py
-
-      - name: Commit normalized data and public graph
-        id: publish
-        if: success() && github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/imports/parliament/research.json data/imports/parliament/normalization-report.json public/data/graph.json
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            git commit -m "Update normalized Parliament data"
-            git push origin HEAD:main
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and deploy updated site
-        if: steps.publish.outputs.changed == 'true'
+      - name: Import one language
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --ref main
-
-      - name: Save archive checkpoint
+          IMPORT_LANGUAGE: ${{ matrix.language }}
+          IMPORT_MAX_SECONDS: ${{ needs.prepare.outputs.max_seconds }}
+          IMPORT_INTERVAL: ${{ inputs.language != 'all' && github.event_name == 'workflow_dispatch' && '0.2' || '0.8' }}
+        # Keep the aggregate request-start rate at five per second.
+        run: >-
+          python import_parliament.py --refresh --languages "$IMPORT_LANGUAGE"
+          --workers 4 --interval "$IMPORT_INTERVAL" --max-seconds "$IMPORT_MAX_SECONDS"
+          --output "data/raw/result/$IMPORT_LANGUAGE/research.json"
+      - name: Upload normalized language result
+        uses: actions/upload-artifact@v4
+        with:
+          name: parliament-result-${{ matrix.language }}
+          path: data/raw/result
+          retention-days: 7
+      - name: Save language checkpoint
         if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
         uses: actions/cache/save@v4
         with:
           path: data/raw/parliament
-          key: parliament-v1-${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Upload import archive and reports
+          key: parliament-v2-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Upload archive and coverage
         if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: parliament-import-${{ github.run_id }}
+          name: parliament-archive-${{ matrix.language }}
+          path: data/raw/parliament
           retention-days: 7
           compression-level: 0
-          path: |
-            data/raw/parliament
-            data/imports/parliament
-
-      - name: Summarize coverage
+      - name: Summarize language coverage
         if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
+        run: python -m pipeline.language_import summary data/raw/parliament/manifest.json >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: [prepare, import]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: parliament-result-*
+          path: data/raw/results
+          merge-multiple: true
+      - name: Combine language snapshots and build public graph
         run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          report = json.loads(Path("data/raw/parliament/manifest.json").read_text())
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
-              summary.write(f"## Parliament import: {report['status']}\n\n")
-              summary.write(f"Languages: {', '.join(report['languages'])}\n\n")
-              summary.write("Paused means the next daily run resumes the initial archive; it does not mean all records were imported.\n\n")
-              summary.write("| Collection | Records | Listing complete |\n| --- | ---: | --- |\n")
-              for name, item in report['collections'].items():
-                  summary.write(f"| {name} | {item['records']} | {item['complete']} |\n")
-              summary.write("\n| Details | Imported | Discovered |\n| --- | ---: | ---: |\n")
-              for name, item in report['details'].items():
-                  summary.write(f"| {name} | {item['completed']} | {item['total']} |\n")
-              for error in report['errors']:
-                  summary.write(f"\n- {error}\n")
-          PY
+          python -m pipeline.language_import combine data/raw/results data/imports/parliament
+          python build_data_pipeline.py
+      - name: Upload combined data for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: parliament-combined
+          path: |
+            data/imports/parliament
+            public/data/graph.json
+          retention-days: 7
+      - name: Commit and publish
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/imports/parliament public/data/graph.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update normalized Parliament language snapshots"
+            git push origin HEAD:main
+            gh workflow run ci.yml --ref main
+          fi
