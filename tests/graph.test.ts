@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { graphSchema, loadGraph } from "../src/lib/graph";
 import graph from "./fixtures/graph.json";
-import empty from "../public/data/graph.json";
+import published from "../public/data/graph.json";
+
+const empty = {
+  schema_version: 1,
+  nodes: [],
+  edges: [],
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,9 +15,13 @@ afterEach(() => {
 });
 
 describe("Python export contract", () => {
-  it("accepts the shared Python fixture and the initial empty export", () => {
+  it("accepts the shared Python fixture and an empty dataset", () => {
     expect(graphSchema.parse(graph).edges).toHaveLength(1);
     expect(graphSchema.parse(empty).edges).toHaveLength(0);
+  });
+
+  it("validates the published dataset", () => {
+    expect(graphSchema.safeParse(published).success).toBe(true);
   });
 
   it("rejects broken references, duplicate IDs, missing evidence, and unsafe URLs", () => {
