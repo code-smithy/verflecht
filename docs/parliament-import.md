@@ -96,7 +96,7 @@ One publication job combines the selected results with committed snapshots under
 6. Writes collection/detail coverage to the run summary.
 7. Checks generated file sizes before committing, then commits the full normalised dataset, generated public graph, and all required parts (including removal of obsolete parts) when they change. Dispatches the Pages CI workflow after a successful push.
 8. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches an import continuation.
-Successful language results are uploaded separately as `parliament-result-<language>`; archives as `parliament-archive-<language>`; combined data as `parliament-combined`. Artifacts are retained for seven days. Cache saving and archive upload are attempted even when an import fails. A failed selected job prevents publication of the whole run.
+   Successful language results are uploaded separately as `parliament-result-<language>`; archives as `parliament-archive-<language>`; combined data as `parliament-combined`. Artifacts are retained for seven days. Cache saving and archive upload are attempted even when an import fails. A failed selected job prevents publication of the whole run.
 
 For local language-isolated work:
 
