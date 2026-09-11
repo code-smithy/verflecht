@@ -73,9 +73,20 @@ Raw archives are ignored by Git and excluded from the website; normalised import
 
 ## GitHub Actions
 
-The intended operating model is one **Import Swiss Parliament** run each night at **01:17 UTC** (02:17 in Zurich in winter, 03:17 in summer). It can also be dispatched manually. GitHub may delay scheduled runs. A scheduled or manual invocation must perform one bounded run, save its checkpoint, and then stop; incomplete work resumes on the next nightly invocation.
+The nightly schedule remains **01:17 UTC**. It starts four separate jobs (`de`, `fr`, `it`, `en`) in parallel. Each has its own four-hour import budget, resumable cache, normalized result, archive artifact, and coverage summary. Failure in one language does not cancel the others. Publication waits for all selected language jobs to succeed; a paused import is a successful checkpoint, not a complete archive.
 
-Each run:
+For a quick test, open **Actions → Import Swiss Parliament → Run workflow**:
+
+- Select `de` (the manual default), or another language, or `all`.
+- Set `max_seconds` between 60 and 14400. Manual runs default to 900 seconds (15 minutes).
+- A single-language run uses the existing five-request-starts-per-second limit. Four-language runs share that aggregate limit through a 0.8-second interval per job.
+- Branch runs upload results for review. Only main runs commit data and dispatch Pages CI.
+
+The time budget limits network work; checkout, cache transfer, normalization and uploads add runtime. Splitting languages avoids waiting for unrelated languages in a German-only test. It does not guarantee that the initial German archive completes within the budget.
+
+Language caches use `parliament-v2-<language>-` keys. Each runner uses the same local archive path but is isolated from the other runners. On the first split run, a legacy `parliament-v1-` cache can seed the job without downloading the existing responses again. It may contain other languages' cached responses; only the selected language is requested and normalized. If caches have expired, the job must fetch its archive again.
+
+One publication job combines the selected results with committed snapshots under `data/imports/parliament/languages/<language>/`. It then rebuilds the canonical `data/imports/parliament/research.json` and public graph. Existing published data seeds missing snapshots during migration. German supplies verified claims and preferred entity names; other languages contribute translated names. A French-only run cannot remove German claims. A German-only run preserves the last saved translations. Snapshot timestamps may differ.
 
 1. Tests the Python pipeline.
 2. Restores the last archive checkpoint from the Actions cache.
@@ -85,7 +96,16 @@ Each run:
 6. Writes collection/detail coverage to the run summary.
 7. Checks generated file sizes before committing, then commits the full normalised dataset, generated public graph, and all required parts (including removal of obsolete parts) when they change. Dispatches the Pages CI workflow after a successful push.
 8. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches an import continuation.
+Successful language results are uploaded separately as `parliament-result-<language>`; archives as `parliament-archive-<language>`; combined data as `parliament-combined`. Artifacts are retained for seven days. Cache saving and archive upload are attempted even when an import fails. A failed selected job prevents publication of the whole run.
 
-A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job commits normalised data, not the raw archive, under the public site's publication policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
+For local language-isolated work:
+
+```sh
+python import_parliament.py --languages de --archive data/raw/parliament-de --output data/raw/results/de/research.json --refresh --max-seconds 900
+python -m pipeline.language_import combine data/raw/results data/imports/parliament
+python build_data_pipeline.py
+```
+
+Use a separate archive and output directory for each language. The workflow serializes runs on the same branch to avoid competing publication jobs. A concurrent unrelated push to main can reject the publication push; it is not force-pushed.
 
 If an older run failed to push oversized single-file exports, deploy this storage change before dispatching the import again. The next run restores the archive checkpoint and rebuilds normalized output in the bounded format. The rejected commit never reached `main`, so that rejection alone requires no Git history rewrite. If its cache has been evicted, restore `data/raw/parliament/` from the failed run's artifact to reuse that archive locally; the workflow does not automatically restore artifacts.
