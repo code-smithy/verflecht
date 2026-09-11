@@ -5,6 +5,46 @@ export type Filters = { query: string; predicate: string; date: string; includeI
 const isActiveOn = (edge: Graph["edges"][number], date: string) =>
   (!edge.valid_from || edge.valid_from <= date) && (!edge.valid_to || edge.valid_to >= date);
 
+export const relationshipEndedBefore = (edge: Graph["edges"][number], date: string) =>
+  Boolean(edge.valid_to && edge.valid_to < date);
+
+export function describeEntity(graph: Graph, entityId: string, referenceDate: string) {
+  const node = graph.nodes.find((candidate) => candidate.id === entityId);
+  if (!node) return null;
+  const edges = graph.edges.filter(
+    (edge) => edge.subject_id === entityId || edge.object_id === entityId,
+  );
+  const relationshipCounts = new Map<string, number>();
+  const connectionCounts = new Map<string, number>();
+  const sourceIds = new Set<string>();
+  for (const edge of edges) {
+    relationshipCounts.set(edge.predicate, (relationshipCounts.get(edge.predicate) ?? 0) + 1);
+    const otherId = edge.subject_id === entityId ? edge.object_id : edge.subject_id;
+    connectionCounts.set(otherId, (connectionCounts.get(otherId) ?? 0) + 1);
+    edge.evidence.forEach((item) => sourceIds.add(item.source.id));
+  }
+  const datedStarts = edges.flatMap((edge) => (edge.valid_from ? [edge.valid_from] : []));
+  const datedEnds = edges.flatMap((edge) => (edge.valid_to ? [edge.valid_to] : []));
+  return {
+    node,
+    relationshipTotal: edges.length,
+    uniqueConnections: connectionCounts.size,
+    currentRelationships: edges.filter((edge) => isActiveOn(edge, referenceDate)).length,
+    endedRelationships: edges.filter((edge) => relationshipEndedBefore(edge, referenceDate)).length,
+    sourceCount: sourceIds.size,
+    firstRecordedDate: datedStarts.sort()[0] ?? null,
+    lastRecordedDate: edges.some((edge) => !edge.valid_to)
+      ? null
+      : (datedEnds.sort().at(-1) ?? null),
+    relationshipBreakdown: [...relationshipCounts]
+      .map(([predicate, count]) => ({ predicate, count }))
+      .sort((a, b) => b.count - a.count || a.predicate.localeCompare(b.predicate)),
+    strongestConnections: [...connectionCounts]
+      .map(([id, count]) => ({ id, count }))
+      .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
+  };
+}
+
 export function filterNetwork(
   graph: Graph,
   filters: Filters,

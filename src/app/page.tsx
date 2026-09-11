@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ForceGraph from "./ForceGraph";
 import { loadGraph, type Graph } from "@/lib/graph";
-import { filterNetwork, networkWindow, type Filters } from "@/lib/network";
+import { describeEntity, filterNetwork, networkWindow, type Filters } from "@/lib/network";
 
 const defaults: Filters = { query: "", predicate: "", date: "", includeInactive: false };
 const label = (s: string) => s.replaceAll("_", " ").toLowerCase();
@@ -16,6 +16,7 @@ export default function Home() {
   const [selected, setSelected] = useState<string | null>(null);
   const [focusDistance, setFocusDistance] = useState(1);
   const [page, setPage] = useState(0);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   useEffect(() => {
     const controller = new AbortController();
     setFailed(false);
@@ -29,6 +30,10 @@ export default function Home() {
   const filtered = useMemo(() => (graph ? filterNetwork(graph, filters) : null), [graph, filters]);
   const visible = useMemo(() => (filtered ? networkWindow(filtered) : null), [filtered]);
   const names = useMemo(() => new Map(graph?.nodes.map((n) => [n.id, n.name])), [graph]);
+  const profile = useMemo(
+    () => (graph && selected ? describeEntity(graph, selected, filters.date || today) : null),
+    [filters.date, graph, selected, today],
+  );
   const edges =
     filtered?.edges.filter(
       (e) => !selected || e.subject_id === selected || e.object_id === selected,
@@ -149,12 +154,19 @@ export default function Home() {
                   graph={visible}
                   selected={selected}
                   focusDistance={focusDistance}
+                  referenceDate={filters.date || today}
                   onSelect={select}
                 />
               )}
               <p className="legend">
-                <span>● People</span>
-                <span>● Organisations / other entities</span>
+                <span className="people-key">● People</span>
+                <span className="entity-key">● Organisations / other entities</span>
+                <span className="line-key">
+                  <i className="solid-line" aria-hidden="true" /> Active relationship
+                </span>
+                <span className="line-key">
+                  <i className="dotted-line" aria-hidden="true" /> Ended relationship
+                </span>
               </p>
               <p className="graph-note">
                 Showing {visible?.nodes.length} of {filtered?.nodes.length} entities and{" "}
@@ -176,8 +188,73 @@ export default function Home() {
             <aside className="evidence-panel" aria-label="Relationship evidence">
               <p className="eyebrow">SOURCE EVIDENCE</p>
               <h2>{selected ? names.get(selected) : "Inspect a connection"}</h2>
+              {profile && (
+                <>
+                  <div className="entity-status-line">
+                    <span className="entity-type">{label(profile.node.type)}</span>
+                    <span
+                      className={`record-status ${profile.currentRelationships ? "current" : "ended"}`}
+                    >
+                      {profile.currentRelationships
+                        ? filters.date
+                          ? "Connected on this date"
+                          : "Current relationships"
+                        : "Historical relationships only"}
+                    </span>
+                  </div>
+                  <section className="entity-overview" aria-label="Entity overview">
+                    <dl className="entity-stats">
+                      <div>
+                        <dt>Connections</dt>
+                        <dd>{profile.uniqueConnections}</dd>
+                      </div>
+                      <div>
+                        <dt>Relationships</dt>
+                        <dd>{profile.relationshipTotal}</dd>
+                      </div>
+                      <div>
+                        <dt>Current</dt>
+                        <dd>{profile.currentRelationships}</dd>
+                      </div>
+                      <div>
+                        <dt>Sources</dt>
+                        <dd>{profile.sourceCount}</dd>
+                      </div>
+                    </dl>
+                    <p className="record-coverage">
+                      Record coverage: {profile.firstRecordedDate ?? "Unknown start"} —{" "}
+                      {profile.lastRecordedDate ?? "Ongoing"}
+                      {profile.endedRelationships
+                        ? ` · ${profile.endedRelationships} ended relationships`
+                        : ""}
+                    </p>
+                    <div className="entity-detail-group">
+                      <h3>Relationship mix</h3>
+                      <div className="relationship-mix">
+                        {profile.relationshipBreakdown.map((item) => (
+                          <span key={item.predicate}>
+                            {label(item.predicate)} <strong>{item.count}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="entity-detail-group">
+                      <h3>Strongest connections</h3>
+                      <div className="strongest-connections">
+                        {profile.strongestConnections.slice(0, 8).map((connection) => (
+                          <button key={connection.id} onClick={() => select(connection.id)}>
+                            <span>{names.get(connection.id) ?? connection.id}</span>
+                            <strong>{connection.count}</strong>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                </>
+              )}
               {selected && (
                 <button
+                  className="show-all-relationships"
                   onClick={() => {
                     setSelected(null);
                     setPage(0);
@@ -186,6 +263,9 @@ export default function Home() {
                   Show all relationships
                 </button>
               )}
+              <h3 className="evidence-heading">
+                {selected ? "Matching evidence" : "Relationships"}
+              </h3>
               <p>{edges.length} matching relationships</p>
               {edges.slice(page * 20, page * 20 + 20).map((e) => (
                 <article key={e.id}>

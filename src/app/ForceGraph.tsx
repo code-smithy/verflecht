@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Graph } from "@/lib/graph";
-import { connectedWithin } from "@/lib/network";
+import { connectedWithin, relationshipEndedBefore } from "@/lib/network";
 
 type Props = {
   graph: Graph;
   selected: string | null;
   focusDistance: number;
+  referenceDate: string;
   onSelect: (id: string) => void;
 };
 
@@ -31,7 +32,13 @@ const hash = (value: string) => {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-export default function ForceGraph({ graph, selected, focusDistance, onSelect }: Props) {
+export default function ForceGraph({
+  graph,
+  selected,
+  focusDistance,
+  referenceDate,
+  onSelect,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<SimNode[]>([]);
@@ -84,8 +91,9 @@ export default function ForceGraph({ graph, selected, focusDistance, onSelect }:
       .map((edge) => ({
         source: nodeById.get(edge.subject_id),
         target: nodeById.get(edge.object_id),
+        ended: relationshipEndedBefore(edge, referenceDate),
       }))
-      .filter((link): link is { source: SimNode; target: SimNode } =>
+      .filter((link): link is { source: SimNode; target: SimNode; ended: boolean } =>
         Boolean(link.source && link.target),
       );
 
@@ -122,11 +130,13 @@ export default function ForceGraph({ graph, selected, focusDistance, onSelect }:
               : "rgba(145, 164, 180, .045)"
             : "rgba(123, 149, 170, .27)";
         context.lineWidth = (directlyConnected ? 2.2 : inFocus ? 0.95 : 0.7) / view.scale;
+        context.setLineDash(link.ended ? [4.5 / view.scale, 4.5 / view.scale] : []);
         context.beginPath();
         context.moveTo(link.source.x, link.source.y);
         context.lineTo(link.target.x, link.target.y);
         context.stroke();
       }
+      context.setLineDash([]);
 
       const labelScale = clamp(1 / view.scale, 0.75, 1.4);
       for (const node of nodes) {
@@ -358,7 +368,7 @@ export default function ForceGraph({ graph, selected, focusDistance, onSelect }:
       canvas.removeEventListener("pointerleave", pointerLeave);
       canvas.removeEventListener("wheel", wheel);
     };
-  }, [graph, onSelect]);
+  }, [graph, onSelect, referenceDate]);
 
   const changeZoom = (factor: number) => {
     const view = viewRef.current;

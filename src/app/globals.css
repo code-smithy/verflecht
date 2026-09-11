@@ -233,15 +233,134 @@ button:disabled {
   gap: 16px;
   font-size: 0.875rem;
 }
-.legend span:first-child {
+.legend .people-key {
   color: #1466b8;
 }
-.legend span:last-child {
+.legend .entity-key {
   color: #a1441b;
+}
+.line-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #526477;
+}
+.line-key i {
+  width: 28px;
+  border-top: 2px solid #7892a8;
+}
+.line-key .dotted-line {
+  border-top-style: dotted;
 }
 .evidence-panel {
   max-height: 850px;
   overflow: auto;
+}
+.entity-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.entity-type,
+.record-status {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.entity-type {
+  background: #e8eef5;
+  color: #40556a;
+}
+.record-status.current {
+  background: #dff3e7;
+  color: #17643a;
+}
+.record-status.ended {
+  background: #f1e9e4;
+  color: #79503d;
+}
+.entity-overview {
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #f8fafc;
+}
+.entity-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.entity-stats div {
+  min-width: 0;
+}
+.entity-stats dt {
+  color: #667483;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.entity-stats dd {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.record-coverage {
+  margin: 14px 0 0;
+  color: #526477;
+  font-size: 0.8rem;
+}
+.entity-detail-group {
+  margin-top: 16px;
+}
+.entity-detail-group h3,
+.evidence-heading {
+  margin: 0 0 9px;
+  font-size: 0.85rem;
+}
+.relationship-mix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.relationship-mix span {
+  padding: 5px 7px;
+  border: 1px solid #d6e0e9;
+  border-radius: 5px;
+  background: white;
+  color: #526477;
+  font-size: 0.75rem;
+}
+.relationship-mix strong {
+  color: #17202a;
+}
+.strongest-connections {
+  display: grid;
+  gap: 5px;
+}
+.strongest-connections button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 7px 9px;
+  text-align: left;
+}
+.strongest-connections button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.show-all-relationships {
+  width: 100%;
+  margin-bottom: 20px;
+}
+.evidence-heading {
+  margin-top: 2px;
 }
 article {
   padding: 20px 0;

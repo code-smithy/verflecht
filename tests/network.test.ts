@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/graph.json";
 import { graphSchema } from "../src/lib/graph";
-import { connectedWithin, filterNetwork, networkWindow } from "../src/lib/network";
+import {
+  connectedWithin,
+  describeEntity,
+  filterNetwork,
+  networkWindow,
+  relationshipEndedBefore,
+} from "../src/lib/network";
 
 const graph = graphSchema.parse(fixture);
 describe("network explorer", () => {
@@ -98,5 +104,24 @@ describe("network explorer", () => {
     expect(connectedWithin(chain, graph.nodes[1].id, 2)).toEqual(
       new Set([graph.nodes[1].id, graph.nodes[0].id, third.id]),
     );
+  });
+  it("marks a relationship as ended only after its recorded end date", () => {
+    const edge = { ...graph.edges[0], valid_to: "2024-06-30" };
+    expect(relationshipEndedBefore(edge, "2024-06-30")).toBe(false);
+    expect(relationshipEndedBefore(edge, "2024-07-01")).toBe(true);
+    expect(relationshipEndedBefore({ ...edge, valid_to: null }, "2024-07-01")).toBe(false);
+  });
+  it("summarises a selected entity from its source-backed relationships", () => {
+    const profile = describeEntity(graph, graph.nodes[1].id, "2026-01-01");
+    expect(profile).toMatchObject({
+      node: graph.nodes[1],
+      relationshipTotal: 1,
+      uniqueConnections: 1,
+      currentRelationships: 1,
+      endedRelationships: 0,
+      sourceCount: 1,
+    });
+    expect(profile?.relationshipBreakdown).toEqual([{ predicate: "MEMBER_OF", count: 1 }]);
+    expect(profile?.strongestConnections).toEqual([{ id: graph.nodes[0].id, count: 1 }]);
   });
 });
