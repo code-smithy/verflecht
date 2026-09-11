@@ -14,11 +14,13 @@
 ## Implemented: nightly collection
 
 - Run the Parliament importer once per night at 01:17 UTC.
-- Keep each import bounded to four hours, then save its checkpoint and stop.
+- Run one job per language in parallel, each bounded to four hours, then save its checkpoint and stop.
 - Resume an incomplete archive during the next nightly run.
-- Keep manual dispatch available as one bounded run without self-dispatching a continuation.
+- Manual dispatch selects one language or all languages and defaults to a 15-minute budget; no self-dispatched continuations.
 
 ## Next: add further sources
+
+All multilingual adapters must use separate language jobs, checkpoints and snapshots, with single-language manual runs and all-language nightly runs. Follow [the import conventions](import-conventions.md). Parliament now follows this model.
 
 1. Add source-specific Python adapters behind the same nightly, checkpointed operating model.
 2. Test unchanged imports, changed versions, and failure recovery for every adapter.

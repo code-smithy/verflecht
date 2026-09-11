@@ -178,6 +178,21 @@ class ParliamentTests(unittest.TestCase):
             materialize(directory, output)
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["claims"], [])
 
+    def test_legacy_multilingual_cache_can_resume_one_language(self):
+        responses = {}
+        for language in ("de", "fr"):
+            responses[request_url("councillors", language, 1)] = [{"id": 1, "updated": "same"}]
+            responses[request_url("councillors/1", language)] = {"id": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            resources = (Resource("councillors", "councillors"),)
+            import_archive(directory, ["de", "fr"], resources=resources, client=self.client(directory, responses))
+            resumed = self.client(directory, {})
+            state = import_archive(directory, ["de"], resources=resources, client=resumed)
+            self.assertEqual(state["languages"], ["de"])
+            self.assertEqual(set(state["collections"]), {"de/councillors"})
+            self.assertEqual(state["status"], "complete")
+            resumed.download.assert_not_called()
+
     def test_active_party_and_faction_affiliations(self):
         person = {"id": 1, "firstName": "Example", "lastName": "Person", "active": True,
                   "partyId": 12, "partyName": "Example Party",
