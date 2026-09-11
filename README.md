@@ -1,5 +1,7 @@
 # Verflecht
 
+The Parliament normaliser also publishes explicit affair authorship and individual co-signatures from cached official records. It excludes inferred authors, vote similarity, and unverified topic mappings. See [the import documentation](docs/parliament-import.md).
+
 Source-backed political network research with Python ingestion and projection pipelines and a login-free Next.js viewer. The application deliberately uses no Supabase database, Supabase Storage, authentication service, or login. Source imports fetch data in scheduled Python jobs; the deterministic projection build itself remains offline.
 
 ## Quick start

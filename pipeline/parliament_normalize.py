@@ -32,6 +32,7 @@ def materialize(archive, output):
     client = Client(archive)
     entities, documents, claims = {}, {}, {}
     skipped = []
+    skipped_affairs = []
 
     def entity(kind, identifier, name, language):
         key = f"parliament:{kind.lower()}:{identifier}"
@@ -128,6 +129,7 @@ def materialize(archive, output):
     # Multiple historical terms share a person ID, so deduplicate requests only,
     # never the original historical rows.
     person_tasks = set()
+    affair_tasks = set()
     kinds = {"committees": "COMMITTEE", "councils": "PARLIAMENT", "cantons": "LOCATION",
              "parties/historic": "POLITICAL_PARTY", "factions": "ORGANISATION",
              "factions/historic": "ORGANISATION", "departments": "GOVERNMENT_BODY",
@@ -143,6 +145,8 @@ def materialize(archive, output):
                 if path.startswith("councillors"):
                     entity("PERSON", row["id"], " ".join(filter(None, [row.get("firstName"), row.get("lastName")])), language)
                     person_tasks.add((row["id"], language))
+                elif path == "affairs" and type(row.get("id")) is int:
+                    affair_tasks.add((row["id"], language))
                 elif path in kinds:
                     # Organisation IDs in different upstream tables can overlap.
                     entity(kinds[path], f"{path.split('/')[0]}:{row['id']}" if kinds[path] in ("ORGANISATION", "GOVERNMENT_BODY") else row["id"], row.get("name") or row.get("abbreviation"), language)
@@ -153,6 +157,74 @@ def materialize(archive, output):
             response, row = cached
             process_person(row, response, language)
             details_available += 1
+    affair_details_available = 0
+    for identifier, language in sorted(affair_tasks):
+        cached = cached_response(client, f"affairs/{identifier}", language)
+        if cached is None:
+            continue
+        response, row = cached
+        affair_details_available += 1
+        title = row.get("title")
+        if row.get("id") != identifier or not isinstance(title, str) or not title.strip():
+            skipped_affairs.append({"affair": identifier, "reason": "missing title or mismatched ID"})
+            continue
+        affair = entity("PARLIAMENTARY_AFFAIR", identifier, title, language)
+        if language != "de":
+            continue
+        # The author object may also contain faction context for a councillor.
+        # Only an explicit author role is eligible; correspondents are not authors.
+        roles = row.get("roles") if isinstance(row.get("roles"), list) else []
+        author = row.get("author")
+        candidates = ([author] if isinstance(author, dict) else []) + roles
+        seen = set()
+        for role in candidates:
+            if not isinstance(role, dict) or role.get("type") not in ("author", "cosign"):
+                continue
+            predicate = "AUTHORED" if role["type"] == "author" else "CO_SIGNED"
+            fields = [field for field in ("councillor", "committee") if role.get(field) is not None]
+            if not fields and role.get("faction") is not None:
+                fields = ["faction"]
+            if len(fields) != 1:
+                skipped_affairs.append({"affair": identifier, "reason": "unsupported or ambiguous author"})
+                continue
+            field = fields[0]
+            if predicate == "CO_SIGNED" and field != "councillor":
+                skipped_affairs.append({"affair": identifier, "reason": "unsupported co-signatory type"})
+                continue
+            target = role[field]
+            if not isinstance(target, dict) or type(target.get("id")) is not int or target["id"] <= 0 or not isinstance(target.get("name"), str) or not target["name"].strip():
+                skipped_affairs.append({"affair": identifier, "reason": "author has no explicit ID/name"})
+                continue
+            kind = {"councillor": "PERSON", "committee": "COMMITTEE", "faction": "ORGANISATION"}[field]
+            target_key = f"factions:{target['id']}" if field == "faction" else target["id"]
+            subject = f"parliament:{kind.lower()}:{target_key}"
+            if (subject, predicate) in seen:
+                continue
+            seen.add((subject, predicate))
+            # Preserve the existing councillor's canonical name when available.
+            if subject not in entities:
+                entity(kind, target_key, target["name"], language)
+            excerpt = encode({"id": identifier, "title": title, "role": role})
+            doc_id = f"parliament:affair-document:{identifier}:{response['sha256'][:16]}"
+            identity = encode([subject, affair, predicate])
+            claim_id = "parliament:claim:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+            version = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()[:16]
+            claims[f"{claim_id}:{version}"] = {
+                "id": f"{claim_id}:{version}", "subject_id": subject, "object_id": affair,
+                "predicate": predicate, "connection_class": "OFFICIAL",
+                "valid_from": None, "valid_to": None, "status": "VERIFIED",
+                "reviewed_by": "automatic:ch-parliament-official-api",
+                "reviewed_at": response["retrieved_at"],
+                "evidence": [{"document_id": doc_id, "text": excerpt}],
+                "imported_from": response["url"],
+            }
+            document = documents.setdefault(doc_id, {
+                "id": doc_id, "source_id": SOURCE["id"], "title": title,
+                "url": response["url"], "text": "", "raw_sha256": response["sha256"],
+                "retrieved_at": response["retrieved_at"],
+                "extraction": "JSON serialization of explicit affair author roles",
+            })
+            document["text"] += excerpt + "\n"
     dataset = {"schema_version": 1, "sources": [SOURCE], "documents": sorted(documents.values(), key=lambda row: row["id"]),
                "entities": sorted(entities.values(), key=lambda row: row["id"]), "claims": sorted(claims.values(), key=lambda row: row["id"])}
     project(dataset)
@@ -160,6 +232,9 @@ def materialize(archive, output):
     report = {"source": SOURCE["id"], "archive_status": manifest["status"], "languages": manifest["languages"],
               "entities": len(entities), "documents": len(documents), "verified_claims": len(claims),
               "person_detail_responses": details_available, "skipped_memberships": skipped,
-              "note": "Council/committee memberships and explicit party/faction affiliations of active members are automatically published. Party/faction dates are unknown. Affairs, votes and inferred affiliations are not published."}
+              "affair_detail_responses": affair_details_available, "skipped_affairs": skipped_affairs,
+              "authorship_claims": sum(claim["predicate"] == "AUTHORED" for claim in claims.values()),
+              "cosignatory_claims": sum(claim["predicate"] == "CO_SIGNED" for claim in claims.values()),
+              "note": "Explicit memberships and affair authorship are automatically published. Party/faction and authorship dates are unknown. Votes and inferred affiliations are not published."}
     atomic_json(Path(output).with_name("normalization-report.json"), report)
     return report

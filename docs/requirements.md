@@ -1,5 +1,7 @@
 # Political Network Research Platform — Requirements
 
+The Parliament normaliser also publishes explicit affair authorship and individual co-signatures from cached official records. It excludes inferred authors, vote similarity, and unverified topic mappings. See [the import documentation](parliament-import.md).
+
 ## Current architecture
 
 The source of truth is local `data/research.json`. Python import scripts collect external source data into local, resumable archives and unverified research candidates. A separate standard-library Python pipeline validates reviewed records and produces a browser-ready public JSON graph. Next.js reads that export.

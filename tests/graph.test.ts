@@ -24,6 +24,19 @@ describe("Python export contract", () => {
     expect(graphSchema.safeParse(published).success).toBe(true);
   });
 
+  it("accepts parliamentary affairs with distinct authorship and co-signature links", () => {
+    for (const predicate of ["AUTHORED", "CO_SIGNED"]) {
+      const affairGraph = {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+          node.id === graph.edges[0].object_id ? { ...node, type: "PARLIAMENTARY_AFFAIR" } : node,
+        ),
+        edges: [{ ...graph.edges[0], predicate }],
+      };
+      expect(graphSchema.parse(affairGraph).edges[0].predicate).toBe(predicate);
+    }
+  });
+
   it("rejects broken references, duplicate IDs, missing evidence, and unsafe URLs", () => {
     const invalid = [
       { ...graph, nodes: [] },

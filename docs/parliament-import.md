@@ -1,5 +1,13 @@
 # Swiss Parliament import
 
+## Parliamentary affairs
+
+The normaliser reads cached `affairs/{id}` details discovered in the `affairs` lists. It creates `PARLIAMENTARY_AFFAIR` entities and automatically publishes `AUTHORED` and `CO_SIGNED` links from explicit `author` and `cosign` roles. Individual authors reuse councillor IDs; committee and faction authors reuse their catalogue IDs. A faction listed beside an individual author is context, not another author. Correspondents, names in free text, and unsupported roles do not produce links.
+
+German details provide evidence. Translated titles are retained without duplicate links. Missing detail responses are skipped until a later import downloads them; malformed author identities are counted in `skipped_affairs`. The report includes `affair_detail_responses`, `authorship_claims`, and `cosignatory_claims`. Rebuilding replaces removed source roles. Authorship dates remain unknown; the filing date is not treated as a membership period.
+
+This extends automatic publication beyond the memberships described below. Votes and topic/indexing-code mappings remain outside this release. No new network requests or workflow changes are required: the nightly job normalises the available archive and publishes its graph. The viewer's relationship filter includes the new predicates when data is present.
+
 ## Party and faction affiliations
 
 The normaliser also publishes `MEMBER_OF` links from active councillors to their explicitly identified party and faction. It uses `partyId`/`partyName` and `factionId`/`factionName` from the German detail response. IDs match the party and faction catalogue entities; translations do not create duplicate links.
