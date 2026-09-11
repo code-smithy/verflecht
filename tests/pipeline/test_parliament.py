@@ -129,6 +129,55 @@ class ParliamentTests(unittest.TestCase):
             with self.assertRaises(BudgetReached):
                 client.fetch("councillors", "de", 1)
 
+    def test_affair_authors_are_explicit_deduplicated_and_source_backed(self):
+        person = {"type": "author", "councillor": {"id": 1, "name": "Person Example"},
+                  "faction": {"id": 2, "name": "Context, not a coauthor"}}
+        committee = {"type": "author", "committee": {"id": 25, "name": "Committee"}}
+        faction = {"type": "author", "faction": {"id": 3, "name": "Author Faction"}}
+        responses = {}
+        for language in ("de", "fr"):
+            responses[request_url("affairs", language, 1)] = [{"id": 20243200, "updated": "first"}]
+            responses[request_url("affairs/20243200", language)] = {
+                "id": 20243200, "title": "Example affair" if language == "de" else "French title",
+                "author": person, "roles": [person, committee, faction,
+                    {"type": "cosign", "councillor": {"id": 4, "name": "Explicit Co-signatory"}},
+                    {"type": "correspondent", "councillor": {"id": 99, "name": "Not an author"}},
+                    {"type": "author", "councillor": {"name": "Missing ID"}},
+                    {"type": "author", "councillor": {"id": True, "name": "Bad ID"}},
+                    {"type": "author", "councillor": person["councillor"], "committee": committee["committee"]}],
+                "texts": [{"value": "Mentioned Person must not become an author"}],
+            }
+        with tempfile.TemporaryDirectory() as directory:
+            resources = (Resource("affairs", "affairs"),)
+            import_archive(directory, ["de", "fr"], resources=resources, client=self.client(directory, responses))
+            output = Path(directory) / "normalized/research.json"
+            report = materialize(directory, output)
+            dataset = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(report["authorship_claims"], 3)
+            self.assertEqual(report["cosignatory_claims"], 1)
+            self.assertEqual(report["affair_detail_responses"], 2)
+            self.assertEqual(len(report["skipped_affairs"]), 3)
+            self.assertEqual(len(project(dataset)["edges"]), 4)
+            self.assertEqual({c["subject_id"] for c in dataset["claims"]},
+                             {"parliament:person:1", "parliament:person:4", "parliament:committee:25", "parliament:organisation:factions:3"})
+            affair = next(e for e in dataset["entities"] if e["type"] == "PARLIAMENTARY_AFFAIR")
+            self.assertEqual(affair["names"], {"de": "Example affair", "fr": "French title"})
+            for claim in dataset["claims"]:
+                self.assertEqual(claim["predicate"], "CO_SIGNED" if claim["subject_id"] == "parliament:person:4" else "AUTHORED")
+                self.assertEqual(claim["status"], "VERIFIED")
+                self.assertIsNone(claim["valid_from"])
+                self.assertIn(claim["evidence"][0]["text"], dataset["documents"][0]["text"])
+            original = output.read_bytes()
+            materialize(directory, output)
+            self.assertEqual(output.read_bytes(), original)
+            for language in ("de", "fr"):
+                responses[request_url("affairs", language, 1)][0]["updated"] = "second"
+                responses[request_url("affairs/20243200", language)]["author"] = None
+                responses[request_url("affairs/20243200", language)]["roles"] = []
+            import_archive(directory, ["de", "fr"], resources=resources, client=self.client(directory, responses), refresh=True)
+            materialize(directory, output)
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["claims"], [])
+
     def test_active_party_and_faction_affiliations(self):
         person = {"id": 1, "firstName": "Example", "lastName": "Person", "active": True,
                   "partyId": 12, "partyName": "Example Party",

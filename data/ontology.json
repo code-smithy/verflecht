@@ -10,6 +10,7 @@
     "GOVERNMENT_BODY",
     "EVENT",
     "INITIATIVE",
+    "PARLIAMENTARY_AFFAIR",
     "ASSOCIATION",
     "MEDIA_OUTLET",
     "LOCATION",
@@ -18,6 +19,8 @@
   ],
   "predicates": [
     "MEMBER_OF",
+    "AUTHORED",
+    "CO_SIGNED",
     "PRESIDENT_OF",
     "VICE_PRESIDENT_OF",
     "BOARD_MEMBER_OF",
