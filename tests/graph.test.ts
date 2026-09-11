@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { graphSchema, loadGraph } from "../src/lib/graph";
 import graph from "./fixtures/graph.json";
-import published from "../public/data/graph.json";
 
 const empty = {
   schema_version: 1,
@@ -20,8 +21,15 @@ describe("Python export contract", () => {
     expect(graphSchema.parse(empty).edges).toHaveLength(0);
   });
 
-  it("validates the published dataset", () => {
-    expect(graphSchema.safeParse(published).success).toBe(true);
+  it("validates the published dataset through the production loader", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () => JSON.parse(readFileSync(resolve("public", url.slice(1)), "utf-8")),
+      })),
+    );
+    await expect(loadGraph()).resolves.toHaveProperty("schema_version", 1);
   });
 
   it("accepts parliamentary affairs with distinct authorship and co-signature links", () => {
@@ -103,5 +111,67 @@ describe("Python export contract", () => {
       cache: "no-store",
       signal: undefined,
     });
+  });
+
+  it("assembles parts with cross-part references under the project path", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_BASE_PATH", "/verflecht");
+    const nodes = `graph.parts/${"a".repeat(64)}.json`;
+    const edges = `graph.parts/${"b".repeat(64)}.json`;
+    const manifest = {
+      schema_version: 1,
+      storage: "json-parts-v1",
+      parts: { nodes: [nodes], edges: [edges] },
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => manifest })
+      .mockResolvedValueOnce({ ok: true, json: async () => graph.nodes })
+      .mockResolvedValueOnce({ ok: true, json: async () => graph.edges });
+    vi.stubGlobal("fetch", request);
+    const signal = new AbortController().signal;
+    expect(await loadGraph(signal)).toEqual(graph);
+    expect(request).toHaveBeenLastCalledWith(`/verflecht/data/${edges}`, {
+      cache: "no-store",
+      signal,
+    });
+  });
+
+  it("rejects missing parts, unsafe paths, and duplicate IDs across parts", async () => {
+    const part = `graph.parts/${"a".repeat(64)}.json`;
+    const manifest = {
+      schema_version: 1,
+      storage: "json-parts-v1",
+      parts: { nodes: [part], edges: [] },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => manifest })
+        .mockResolvedValueOnce({ ok: false }),
+    );
+    await expect(loadGraph()).rejects.toThrow("could not be loaded");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ...manifest,
+          parts: { nodes: ["../research.json"], edges: [] },
+        }),
+      }),
+    );
+    await expect(loadGraph()).rejects.toThrow();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ...manifest, parts: { nodes: [part, part], edges: [] } }),
+        })
+        .mockResolvedValue({ ok: true, json: async () => graph.nodes }),
+    );
+    await expect(loadGraph()).rejects.toThrow("Duplicate graph IDs");
   });
 });

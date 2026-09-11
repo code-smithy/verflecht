@@ -40,13 +40,24 @@ jobs:
       - name: Build public data
         run: python build_data_pipeline.py
 
+      - name: Check generated file sizes before committing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          roots = (Path("data/imports/parliament"), Path("public/data"))
+          oversized = [str(path) for root in roots for path in root.rglob("*")
+                       if path.is_file() and path.stat().st_size >= 100 * 1024 * 1024]
+          if oversized:
+              raise SystemExit("Generated files exceed GitHub's file limit: " + ", ".join(oversized))
+          PY
+
       - name: Commit normalized data and public graph
         id: publish
         if: success() && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/imports/parliament/research.json data/imports/parliament/normalization-report.json public/data/graph.json
+          git add -A data/imports/parliament public/data
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

@@ -2,23 +2,14 @@
 
 import hashlib
 import json
-import os
-import tempfile
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from pipeline.json_store import ValidationError, read_dataset, require, unique_keys, write_dataset
+
 ROOT = Path(__file__).resolve().parents[1]
 ONTOLOGY = json.loads((ROOT / "data/ontology.json").read_text(encoding="utf-8"))
-
-
-class ValidationError(ValueError):
-    """An actionable error in the local dataset."""
-
-
-def require(condition, message):
-    if not condition:
-        raise ValidationError(message)
 
 
 def string(record, key, context):
@@ -200,14 +191,6 @@ def project(dataset):
     }
 
 
-def unique_keys(pairs):
-    result = {}
-    for key, value in pairs:
-        require(key not in result, f"JSON: duplicate key {key}")
-        result[key] = value
-    return result
-
-
 def merge_research(authored, imported):
     """Combine local imports, with explicit authored records taking precedence."""
     merged = {"schema_version": 1}
@@ -224,24 +207,10 @@ def merge_research(authored, imported):
 def build(input_path, output_path, check=False, import_paths=()):
     input_path, output_path = Path(input_path).resolve(), Path(output_path).resolve()
     require(input_path != output_path, "input and output paths must differ")
-    dataset = json.loads(input_path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_keys)
+    dataset = read_dataset(input_path)
     if import_paths:
-        imports = [json.loads(Path(path).read_text(encoding="utf-8-sig"), object_pairs_hook=unique_keys) for path in import_paths]
+        imports = [read_dataset(path) for path in import_paths]
         dataset = merge_research(dataset, imports)
     graph = project(dataset)
-    serialized = json.dumps(graph, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
-    if check:
-        require(output_path.is_file() and output_path.read_bytes() == serialized.encode("utf-8"), "generated graph is missing or stale; run python build_data_pipeline.py")
-        return graph
-    # Validate everything before touching the last successful public export.
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=output_path.parent, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(serialized)
-        os.replace(temporary, output_path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    write_dataset(output_path, graph, indent=2, check=check)
     return graph

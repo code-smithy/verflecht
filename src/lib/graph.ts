@@ -72,9 +72,38 @@ export const graphSchema = z
 
 export type Graph = z.infer<typeof graphSchema>;
 
+const partPath = z.string().regex(/^graph\.parts\/[a-f0-9]{64}\.json$/);
+const manifestSchema = z
+  .object({
+    schema_version: z.literal(1),
+    storage: z.literal("json-parts-v1"),
+    parts: z.object({ nodes: z.array(partPath), edges: z.array(partPath) }).strict(),
+  })
+  .strict();
+
 export async function loadGraph(signal?: AbortSignal): Promise<Graph> {
   const basePath = process.env.NEXT_PUBLIC_SITE_BASE_PATH ?? "";
-  const response = await fetch(`${basePath}/data/graph.json`, { cache: "no-store", signal });
-  if (!response.ok) throw new Error("Research data could not be loaded. Please try again.");
-  return graphSchema.parse(await response.json());
+  const read = async (path: string): Promise<unknown> => {
+    const response = await fetch(`${basePath}/data/${path}`, { cache: "no-store", signal });
+    if (!response.ok) throw new Error("Research data could not be loaded. Please try again.");
+    return response.json();
+  };
+  const data = await read("graph.json");
+  if (typeof data !== "object" || data === null || !("storage" in data)) {
+    return graphSchema.parse(data);
+  }
+  const manifest = manifestSchema.parse(data);
+  const assembled: { schema_version: 1; nodes: unknown[]; edges: unknown[] } = {
+    schema_version: 1,
+    nodes: [],
+    edges: [],
+  };
+  // Bound concurrent downloads and retain validation across all part boundaries.
+  for (const key of ["nodes", "edges"] as const) {
+    for (const path of manifest.parts[key]) {
+      const rows = z.array(z.unknown()).parse(await read(path));
+      for (const row of rows) assembled[key].push(row);
+    }
+  }
+  return graphSchema.parse(assembled);
 }

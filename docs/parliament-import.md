@@ -61,6 +61,10 @@ The default rate is at most five request starts per second across four workers, 
 - `data/imports/parliament/research.json`: normalized entities, council/committee memberships, and active-member party/faction affiliations.
 - `data/imports/parliament/normalization-report.json`: normalization counts and skipped membership records.
 
+Normalized research and the public graph use size-bounded JSON storage. Exports up to 32 MiB remain a single JSON object. Larger exports replace `research.json` or `graph.json` with a `json-parts-v1` manifest; its `parts` map lists collection arrays in adjacent `research.parts/` or `graph.parts/` directories. Each file is at most 32 MiB, measured as UTF-8 bytes. Part names contain their SHA-256 hash. The pipeline reads both formats, verifies research part hashes, and checks every generated graph part with `--check`. The website loads graph parts before validating the complete graph. All records and evidence are retained; an individual record exceeding the limit fails explicitly.
+
+Keep each manifest together with its parts when copying or downloading normalized data. Python consumers can use `pipeline.json_store.read_dataset(path)` to read either format. A successful rebuild removes obsolete generated parts. Chunking addresses GitHub's per-file limit; the browser still loads the complete graph, so total download size and browser memory remain proportional to the dataset.
+
 The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection currently maps people, institutions, council/committee memberships, and active-member party/faction affiliations. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, or free-text disclosures. German membership excerpts supply evidence; entity names retain translations.
 
 Explicit council and committee memberships and active-member party/faction affiliations returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. This exception applies only to direct structured membership records. Votes, free text, co-mentions, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
@@ -79,7 +83,9 @@ Each run:
 4. Validates/builds the public graph, including explicit official memberships.
 5. Saves a new cache checkpoint and uploads the raw archive, normalized research, and coverage reports as a `parliament-import-<run ID>` artifact retained for seven days.
 6. Writes collection/detail coverage to the run summary.
-7. Commits the full normalised dataset and generated public graph when they change, then dispatches the Pages CI workflow.
+7. Checks generated file sizes before committing, then commits the full normalised dataset, generated public graph, and all required parts (including removal of obsolete parts) when they change. Dispatches the Pages CI workflow after a successful push.
 8. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches an import continuation.
 
 A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job commits normalised data, not the raw archive, under the public site's publication policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
+
+If an older run failed to push oversized single-file exports, deploy this storage change before dispatching the import again. The next run restores the archive checkpoint and rebuilds normalized output in the bounded format. The rejected commit never reached `main`, so that rejection alone requires no Git history rewrite. If its cache has been evicted, restore `data/raw/parliament/` from the failed run's artifact to reuse that archive locally; the workflow does not automatically restore artifacts.

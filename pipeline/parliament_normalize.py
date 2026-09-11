@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from pipeline.build import project, require
+from pipeline.json_store import write_dataset
 from pipeline.parliament import BASE_URL, Client, atomic_json, encode, request_url
 
 SOURCE = {"id": "ch-parliament", "name": "Swiss Parliament — public web services",
@@ -228,7 +229,7 @@ def materialize(archive, output):
     dataset = {"schema_version": 1, "sources": [SOURCE], "documents": sorted(documents.values(), key=lambda row: row["id"]),
                "entities": sorted(entities.values(), key=lambda row: row["id"]), "claims": sorted(claims.values(), key=lambda row: row["id"])}
     project(dataset)
-    atomic_json(output, dataset)
+    write_dataset(output, dataset)
     report = {"source": SOURCE["id"], "archive_status": manifest["status"], "languages": manifest["languages"],
               "entities": len(entities), "documents": len(documents), "verified_claims": len(claims),
               "person_detail_responses": details_available, "skipped_memberships": skipped,
