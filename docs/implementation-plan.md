@@ -11,13 +11,17 @@
 - Add Python tests and a shared export fixture checked by the TypeScript consumer; enforce data freshness in CI.
 - Document local authoring, review, correction, rebuild, and deployment commands.
 
-## Next: enforce nightly collection
+## Implemented: nightly collection
 
-1. Remove the Parliament workflow's immediate self-dispatch continuation.
-2. Keep the existing four-hour bound, checkpoint restore/save, and failure handling.
-3. Resume an incomplete initial archive only when the next nightly schedule starts.
-4. Verify that manual dispatch still performs exactly one bounded run.
-5. Add further source-specific Python adapters behind the same nightly, checkpointed operating model.
+- Run the Parliament importer once per night at 01:17 UTC.
+- Keep each import bounded to four hours, then save its checkpoint and stop.
+- Resume an incomplete archive during the next nightly run.
+- Keep manual dispatch available as one bounded run without self-dispatching a continuation.
+
+## Next: add further sources
+
+1. Add source-specific Python adapters behind the same nightly, checkpointed operating model.
+2. Test unchanged imports, changed versions, and failure recovery for every adapter.
 
 ## Later: research workflow and viewer
 
@@ -27,4 +31,4 @@
 - Add graph interaction, search, filters, and timelines over the same public JSON contract.
 - Add stronger history enforcement and concurrent editing only if the local workflow requires them.
 
-The Swiss Parliament adapter now archives the legacy API in all four languages, resumes interrupted imports, and refreshes changed records. Its workflow has a nightly schedule, but currently self-dispatches continuation runs while the initial archive is incomplete. Removing that continuation is the next implementation step so actual execution matches the nightly-only design. See [the importer documentation](parliament-import.md). Supabase, login, LLM providers, and multi-user services are intentionally absent.
+The Swiss Parliament adapter now archives the legacy API in all four languages, resumes interrupted imports on the next nightly run, and refreshes changed records. See [the importer documentation](parliament-import.md). Supabase, login, LLM providers, and multi-user services are intentionally absent.
