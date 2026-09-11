@@ -63,6 +63,6 @@ Each run:
 4. Validates/builds reviewed data without publishing imported candidates.
 5. Saves a new cache checkpoint and uploads the raw archive, normalized research, and coverage reports as a `parliament-import-<run ID>` artifact retained for seven days.
 6. Writes collection/detail coverage to the run summary.
-7. Currently dispatches a continuation when paused with new downloads. This makes the initial archive run nearly continuously in consecutive jobs. This behaviour is a known temporary deviation and must be removed; a paused archive should wait for the next nightly run. Failed runs do not dispatch a continuation.
+7. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches a continuation.
 
 A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job does not commit bulk data or change the public site's review policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.
