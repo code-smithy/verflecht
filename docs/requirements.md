@@ -2,9 +2,11 @@
 
 ## Current architecture
 
-The source of truth is local `data/research.json`. A standard-library Python pipeline validates records and produces a browser-ready public JSON graph. Next.js reads that export. No hosted database, database credentials, authentication service, or remote storage is required.
+The source of truth is local `data/research.json`. Python import scripts collect external source data into local, resumable archives and unverified research candidates. A separate standard-library Python pipeline validates reviewed records and produces a browser-ready public JSON graph. Next.js reads that export.
 
-The Swiss Parliament public web service is the first source, with a resumable multilingual importer and daily GitHub Actions refresh. Imported memberships require review before publication. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
+The application must remain login-free and must not depend on Supabase, a hosted database, database credentials, an authentication service, or remote application storage. GitHub Actions may retain pipeline checkpoints and artifacts, but it is not an application backend.
+
+The Swiss Parliament public web service is the first source, with a resumable multilingual importer intended to run once per night in GitHub Actions. Imported memberships require review before publication. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
 
 The exact implemented contract is documented in [data-format.md](data-format.md).
 
@@ -28,6 +30,8 @@ The exact implemented contract is documented in [data-format.md](data-format.md)
 - Produce deterministic output without network access.
 - Export only reviewed relationships, evidence/source metadata, and connected entities.
 - Support repeatable rebuilds and a read-only stale-export check in CI.
+- Run collection pipelines once per night. A bounded run must save its checkpoint and stop; it must not dispatch an immediate continuation merely because the archive remains incomplete.
+- Resume incomplete archives during the next nightly run without discarding already collected data.
 - Start with a meaningful empty state; show loading and data errors separately.
 
 ## Later work (not part of this backend replacement)
@@ -36,7 +40,6 @@ The exact implemented contract is documented in [data-format.md](data-format.md)
 - Optional LLM extraction into unverified candidates, semantic evidence checks, and entity resolution.
 - Review tools, stronger enforced history/auditing, and multi-user editing if needed.
 - Interactive network visualization, search, graph filters, entity details, and timelines.
-- Scheduled refreshes once actual sources and refresh needs are known.
 
 Fetchers must respect access controls, paywalls, rate limits, and source-specific publication rules. The build is offline; explicit source imports perform fetching separately. Do not introduce infrastructure for later features before it is needed.
 
