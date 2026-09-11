@@ -29,7 +29,7 @@ data/research.json → Python validation and projection → public/data/graph.js
 
 The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions and produces unverified research candidates.
 
-The intended operating model is one scheduled Python import run per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, and stops until the next nightly run. The current workflow still dispatches immediate continuation runs while the initial Parliament archive is incomplete, so it can run nearly continuously. This is a temporary implementation mismatch, not the target schedule.
+The importer runs once per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, and stops. If the initial Parliament archive is incomplete, the next nightly run resumes it.
 
 ## Commands
 
