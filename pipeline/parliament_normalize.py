@@ -50,6 +50,33 @@ def materialize(archive, output):
         if language != "de":
             return
         evidence = []
+        # These fields describe the active member at the time of retrieval,
+        # not a dated membership history. Never borrow council term dates.
+        if row.get("active") is True:
+            for field, kind, prefix in (("party", "POLITICAL_PARTY", ""),
+                                        ("faction", "ORGANISATION", "factions:")):
+                identifier = row.get(field + "Id")
+                name = row.get(field + "Name")
+                if type(identifier) is not int or identifier <= 0 or not isinstance(name, str) or not name.strip():
+                    skipped.append({"person": row["id"], "reason": f"{field} has no unambiguous ID/name"})
+                    continue
+                target_id = entity(kind, f"{prefix}{identifier}", name, language)
+                excerpt = encode({"id": row["id"], "active": True,
+                                  field + "Id": identifier, field + "Name": name})
+                evidence.append(excerpt)
+                identity = encode([person, target_id, "MEMBER_OF", None, None, None])
+                claim_id = "parliament:claim:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+                version = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()[:16]
+                doc_id = f"parliament:document:{row['id']}:{response['sha256'][:16]}"
+                claims[f"{claim_id}:{version}"] = {
+                    "id": f"{claim_id}:{version}", "subject_id": person, "object_id": target_id,
+                    "predicate": "MEMBER_OF", "connection_class": "OFFICIAL",
+                    "valid_from": None, "valid_to": None, "status": "VERIFIED",
+                    "reviewed_by": "automatic:ch-parliament-official-api",
+                    "reviewed_at": response["retrieved_at"],
+                    "evidence": [{"document_id": doc_id, "text": excerpt}],
+                    "imported_from": response["url"],
+                }
         for field, kind, predicate in (("councilMemberships", "PARLIAMENT", "MEMBER_OF"),
                                         ("committeeMemberships", "COMMITTEE", "MEMBER_OF_COMMITTEE")):
             for membership in row.get(field, []) or []:
@@ -94,7 +121,7 @@ def materialize(archive, output):
                 "title": f"Parliamentary memberships — {entities[person]['name']}",
                 "url": response["url"], "text": "\n".join(evidence),
                 "raw_sha256": response["sha256"], "retrieved_at": response["retrieved_at"],
-                "extraction": "JSON serialization of the source membership objects",
+                "extraction": "JSON serialization of source membership objects and explicit active-member affiliation fields",
             }
 
     # Collect IDs from cached lists, including partially downloaded collections.
@@ -133,6 +160,6 @@ def materialize(archive, output):
     report = {"source": SOURCE["id"], "archive_status": manifest["status"], "languages": manifest["languages"],
               "entities": len(entities), "documents": len(documents), "verified_claims": len(claims),
               "person_detail_responses": details_available, "skipped_memberships": skipped,
-              "note": "All API fields, affairs and votes remain in the raw multilingual archive. Only explicit official council/committee memberships are automatically published; no inferred affiliations are created."}
+              "note": "Council/committee memberships and explicit party/faction affiliations of active members are automatically published. Party/faction dates are unknown. Affairs, votes and inferred affiliations are not published."}
     atomic_json(Path(output).with_name("normalization-report.json"), report)
     return report
