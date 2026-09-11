@@ -129,7 +129,7 @@ class ParliamentTests(unittest.TestCase):
             with self.assertRaises(BudgetReached):
                 client.fetch("councillors", "de", 1)
 
-    def test_normalization_preserves_review_boundary_and_authored_overrides(self):
+    def test_normalization_publishes_explicit_official_facts_and_authored_overrides(self):
         person = {"id": 1, "firstName": "Example", "lastName": "Person", "concerns": [{"name": "Not an inferred affiliation"}],
                   "councilMemberships": [{"id": 0, "entryDate": "2000-01-01T00:00:00Z", "leavingDate": "2004-01-01T00:00:00Z", "council": {"id": 1, "name": "Nationalrat"}}]}
         responses = {request_url("councillors", "de", 1): [{"id": 1}], request_url("councillors/1", "de"): person}
@@ -138,16 +138,18 @@ class ParliamentTests(unittest.TestCase):
             output = Path(directory) / "normalized/research.json"
             report = materialize(directory, output)
             dataset = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(report["pending_claims"], 1)
+            self.assertEqual(report["verified_claims"], 1)
             self.assertEqual(dataset["claims"][0]["connection_class"], "HISTORICAL")
-            self.assertEqual(project(dataset)["edges"], [])
+            self.assertEqual(dataset["claims"][0]["status"], "VERIFIED")
+            self.assertEqual(dataset["claims"][0]["reviewed_by"], "automatic:ch-parliament-official-api")
+            self.assertEqual(len(project(dataset)["edges"]), 1)
             self.assertNotIn("Not an inferred affiliation", encode(dataset))
             original = output.read_bytes()
             materialize(directory, output)
             self.assertEqual(original, output.read_bytes())
             authored = {"schema_version": 1, "sources": [], "documents": [], "entities": [], "claims": [{**dataset["claims"][0], "status": "REJECTED"}]}
             self.assertEqual(merge_research(authored, [dataset])["claims"][0]["status"], "REJECTED")
-            self.assertEqual(dataset["claims"][0]["status"], "PENDING_REVIEW")
+            self.assertEqual(dataset["claims"][0]["status"], "VERIFIED")
 
 
 if __name__ == "__main__":

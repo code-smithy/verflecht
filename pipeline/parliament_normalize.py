@@ -1,4 +1,4 @@
-"""Map source-backed parliamentary memberships to unverified research records.
+"""Map explicit official parliamentary memberships to published research records.
 
 The full, multilingual API archive remains authoritative for fields that do not
 map to the graph. No votes or free-text disclosures become inferred affiliations.
@@ -81,7 +81,9 @@ def materialize(archive, output):
                 claims[f"{claim_id}:{version}"] = {
                     "id": f"{claim_id}:{version}", "subject_id": person, "object_id": target_id,
                     "predicate": predicate, "connection_class": "HISTORICAL" if end else "OFFICIAL",
-                    "valid_from": start, "valid_to": end, "status": "PENDING_REVIEW",
+                    "valid_from": start, "valid_to": end, "status": "VERIFIED",
+                    "reviewed_by": "automatic:ch-parliament-official-api",
+                    "reviewed_at": response["retrieved_at"],
                     "evidence": [{"document_id": doc_id, "text": excerpt}],
                     "imported_from": response["url"],
                 }
@@ -129,8 +131,8 @@ def materialize(archive, output):
     project(dataset)
     atomic_json(output, dataset)
     report = {"source": SOURCE["id"], "archive_status": manifest["status"], "languages": manifest["languages"],
-              "entities": len(entities), "documents": len(documents), "pending_claims": len(claims),
+              "entities": len(entities), "documents": len(documents), "verified_claims": len(claims),
               "person_detail_responses": details_available, "skipped_memberships": skipped,
-              "note": "All API fields, affairs and votes remain in the raw multilingual archive. Only explicit council/committee memberships are projected as candidates."}
+              "note": "All API fields, affairs and votes remain in the raw multilingual archive. Only explicit official council/committee memberships are automatically published; no inferred affiliations are created."}
     atomic_json(Path(output).with_name("normalization-report.json"), report)
     return report

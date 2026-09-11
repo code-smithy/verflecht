@@ -47,7 +47,7 @@ The default rate is at most five request starts per second across four workers, 
 
 The full archive retains every returned field, including multilingual texts, historical rows sharing a councillor ID, affair data, votes, and declared interests. The smaller research projection currently maps people, institutions, and explicit council/committee memberships. It does not infer affiliations from vote similarity, co-mentions, party abbreviations, or free-text disclosures. German membership excerpts supply evidence; entity names retain translations.
 
-Imported claims are `PENDING_REVIEW`. They are not automatically published. Normalized files are generated and should not be edited: place reviewed records and their required entity/document dependencies in `data/research.json`. The default build merges local `data/imports/*/research.json`, with authored records taking precedence. A custom `--input` remains standalone. Committed public data must be reproducible without ignored local files, so copy all dependencies of an approved claim into the authored file before publishing.
+Explicit council and committee memberships returned by the official API are marked `VERIFIED` automatically with `automatic:ch-parliament-official-api` provenance and are published. This exception applies only to direct structured membership records. Votes, free text, co-mentions, and derived or inferred affiliations are not automatically published. The full normalised dataset is committed under `data/imports/parliament/`; generated files should not be edited. Authored records in `data/research.json` take precedence, so they can reject or correct an imported claim with the same ID. A custom `--input` remains standalone.
 
 Raw archives and generated imports are ignored by Git and excluded from the website. They may include publicly returned contact information; only explicitly selected evidence fields can enter the public graph.
 
@@ -60,9 +60,10 @@ Each run:
 1. Tests the Python pipeline.
 2. Restores the last archive checkpoint from the Actions cache.
 3. Imports all four languages for up to four hours, then normalizes available records.
-4. Validates/builds reviewed data without publishing imported candidates.
+4. Validates/builds the public graph, including explicit official memberships.
 5. Saves a new cache checkpoint and uploads the raw archive, normalized research, and coverage reports as a `parliament-import-<run ID>` artifact retained for seven days.
 6. Writes collection/detail coverage to the run summary.
-7. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches a continuation.
+7. Commits the full normalised dataset and generated public graph when they change, then dispatches the Pages CI workflow.
+8. Stops after saving its checkpoint. If the archive is paused, the next nightly run resumes it. The workflow never self-dispatches an import continuation.
 
 A concurrency group prevents simultaneous import jobs. A local archive lock also prevents two processes from writing the same cache. The nightly job does not commit bulk data or change the public site's review policy. Download its artifact to use the archived data locally. Cache eviction can require a new archive; the uploaded artifacts provide a separate recovery copy.

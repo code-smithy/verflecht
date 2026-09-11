@@ -6,14 +6,14 @@ The source of truth is local `data/research.json`. Python import scripts collect
 
 The application must remain login-free and must not depend on Supabase, a hosted database, database credentials, an authentication service, or remote application storage. GitHub Actions may retain pipeline checkpoints and artifacts, but it is not an application backend.
 
-The Swiss Parliament public web service is the first source, with a resumable multilingual importer intended to run once per night in GitHub Actions. Imported memberships require review before publication. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
+The Swiss Parliament public web service is the first source, with a resumable multilingual importer that runs once per night in GitHub Actions. Explicit council and committee memberships from this official source are published automatically with machine-verification provenance. Other imported or inferred relationships still require review. The source registry uses only `official`, `organisation`, `media`, and `other`; formats and discovery mechanisms are separate adapter concerns.
 
 The exact implemented contract is documented in [data-format.md](data-format.md).
 
 ## Research principles
 
 1. Every published relationship must have a concrete source and matching evidence excerpt.
-2. Only manually reviewed `VERIFIED` claims may appear publicly. Machine extraction may create candidates only.
+2. Manually reviewed `VERIFIED` claims may appear publicly. Explicit factual relationships returned by an approved official structured API may also be marked `VERIFIED` automatically with machine provenance. Machine extraction and inferred relationships may create candidates only.
 3. Common mention does not establish a relationship; event participation does not establish membership; official meetings do not establish personal or political affinity.
 4. Preserve `DIRECT`, `INDIRECT`, `OFFICIAL`, and `HISTORICAL` distinctions and validity periods.
 5. Treat events as entities; keep relation predicates controlled.

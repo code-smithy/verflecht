@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 concurrency:
   group: parliament-import
@@ -33,11 +34,32 @@ jobs:
           restore-keys: |
             parliament-v1-
 
-      - name: Import all four languages and normalize candidates
+      - name: Import all four languages and normalize official facts
         run: python import_parliament.py --refresh --languages de fr it en --workers 4 --interval 0.2 --max-seconds 14400
 
-      - name: Build reviewed public data
+      - name: Build public data
         run: python build_data_pipeline.py
+
+      - name: Commit normalized data and public graph
+        id: publish
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/imports/parliament/research.json data/imports/parliament/normalization-report.json public/data/graph.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Update normalized Parliament data"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and deploy updated site
+        if: steps.publish.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
 
       - name: Save archive checkpoint
         if: always() && hashFiles('data/raw/parliament/manifest.json') != ''
@@ -77,4 +99,3 @@ jobs:
               for error in report['errors']:
                   summary.write(f"\n- {error}\n")
           PY
-
