@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: parliament-import
@@ -79,11 +78,3 @@ jobs:
                   summary.write(f"\n- {error}\n")
           PY
 
-      - name: Continue an unfinished initial archive
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if python -c "import json; from pathlib import Path; r=json.loads(Path('data/raw/parliament/manifest.json').read_text()); raise SystemExit(0 if r['status']=='paused' and r['downloaded_requests']>0 else 1)"; then
-            gh workflow run import-parliament.yml --ref main
-          fi
