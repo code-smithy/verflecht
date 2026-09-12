@@ -3,9 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ForceGraph from "./ForceGraph";
 import { loadGraph, type Graph } from "@/lib/graph";
-import { describeEntity, filterNetwork, networkWindow, type Filters } from "@/lib/network";
+import {
+  describeEntity,
+  filterNetwork,
+  isDeclaredInterest,
+  networkWindow,
+  type Filters,
+} from "@/lib/network";
 
-const defaults: Filters = { query: "", predicate: "", date: "", includeInactive: false };
+const defaults: Filters = {
+  query: "",
+  predicate: "",
+  date: "",
+  includeInactive: false,
+  declaredInterestsOnly: false,
+};
 const label = (s: string) => s.replaceAll("_", " ").toLowerCase();
 
 export default function Home() {
@@ -30,6 +42,10 @@ export default function Home() {
   const filtered = useMemo(() => (graph ? filterNetwork(graph, filters) : null), [graph, filters]);
   const visible = useMemo(() => (filtered ? networkWindow(filtered) : null), [filtered]);
   const names = useMemo(() => new Map(graph?.nodes.map((n) => [n.id, n.name])), [graph]);
+  const declaredInterestCount = useMemo(
+    () => graph?.edges.filter(isDeclaredInterest).length ?? 0,
+    [graph],
+  );
   const profile = useMemo(
     () => (graph && selected ? describeEntity(graph, selected, filters.date || today) : null),
     [filters.date, graph, selected, today],
@@ -93,6 +109,14 @@ export default function Home() {
           />
           Include inactive people
         </label>
+        <label className="checkbox-filter interest-filter">
+          <input
+            type="checkbox"
+            checked={filters.declaredInterestsOnly}
+            onChange={(e) => update("declaredInterestsOnly", e.target.checked)}
+          />
+          Declared interests only ({declaredInterestCount})
+        </label>
         <button
           onClick={() => {
             setFilters(defaults);
@@ -122,6 +146,7 @@ export default function Home() {
           <p className="counts" role="status">
             {filtered?.nodes.length} entities · {filtered?.edges.length} relationships
             {!filters.includeInactive ? " · Active people only" : " · Including inactive people"}
+            {filters.declaredInterestsOnly ? " · Officially corroborated interests" : ""}
             {filters.date ? " · Unknown date bounds are included" : ""}
           </p>
           <div className="workspace">

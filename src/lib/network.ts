@@ -1,6 +1,15 @@
 import type { Graph } from "./graph";
 
-export type Filters = { query: string; predicate: string; date: string; includeInactive: boolean };
+export type Filters = {
+  query: string;
+  predicate: string;
+  date: string;
+  includeInactive: boolean;
+  declaredInterestsOnly: boolean;
+};
+
+export const isDeclaredInterest = (edge: Graph["edges"][number]) =>
+  edge.evidence.some((item) => item.document.id.startsWith("parliament:concerns-document:"));
 
 const isActiveOn = (edge: Graph["edges"][number], date: string) =>
   (!edge.valid_from || edge.valid_from <= date) && (!edge.valid_to || edge.valid_to >= date);
@@ -70,6 +79,7 @@ export function filterNetwork(
         )) &&
       (!query || matches.has(e.subject_id) || matches.has(e.object_id)) &&
       (!filters.predicate || e.predicate === filters.predicate) &&
+      (!filters.declaredInterestsOnly || isDeclaredInterest(e)) &&
       (!filters.date || isActiveOn(e, filters.date)),
   );
   const ids = new Set(edges.flatMap((e) => [e.subject_id, e.object_id]));

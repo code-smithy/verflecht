@@ -17,13 +17,20 @@ describe("network explorer", () => {
       predicate: "",
       date: "",
       includeInactive: false,
+      declaredInterestsOnly: false,
     });
     expect(result.edges).toEqual(graph.edges);
     expect(result.nodes).toEqual(graph.nodes);
   });
   it("returns no results for an unknown name", () => {
     expect(
-      filterNetwork(graph, { query: "no match", predicate: "", date: "", includeInactive: false }),
+      filterNetwork(graph, {
+        query: "no match",
+        predicate: "",
+        date: "",
+        includeInactive: false,
+        declaredInterestsOnly: false,
+      }),
     ).toEqual({ schema_version: 1, nodes: [], edges: [] });
   });
   it("filters dates inclusively and relationship types exactly", () => {
@@ -37,6 +44,7 @@ describe("network explorer", () => {
         predicate: "",
         date: "2021-01-01",
         includeInactive: false,
+        declaredInterestsOnly: false,
       }).edges,
     ).toHaveLength(1);
     expect(
@@ -45,6 +53,7 @@ describe("network explorer", () => {
         predicate: "",
         date: "2022-01-01",
         includeInactive: false,
+        declaredInterestsOnly: false,
       }).edges,
     ).toHaveLength(0);
     expect(
@@ -53,6 +62,7 @@ describe("network explorer", () => {
         predicate: "unknown",
         date: "",
         includeInactive: true,
+        declaredInterestsOnly: false,
       }).edges,
     ).toHaveLength(0);
   });
@@ -64,17 +74,49 @@ describe("network explorer", () => {
     expect(
       filterNetwork(
         dated,
-        { query: "", predicate: "", date: "", includeInactive: false },
+        {
+          query: "",
+          predicate: "",
+          date: "",
+          includeInactive: false,
+          declaredInterestsOnly: false,
+        },
         "2026-01-01",
       ).nodes,
     ).toHaveLength(0);
     expect(
       filterNetwork(
         dated,
-        { query: "", predicate: "", date: "", includeInactive: true },
+        {
+          query: "",
+          predicate: "",
+          date: "",
+          includeInactive: true,
+          declaredInterestsOnly: false,
+        },
         "2026-01-01",
       ).nodes,
     ).toHaveLength(2);
+  });
+  it("exposes official declared interests as a dedicated filter", () => {
+    const interest = {
+      ...graph.edges[0],
+      id: "parliament:concern:example",
+      evidence: graph.edges[0].evidence.map((item) => ({
+        ...item,
+        document: { ...item.document, id: "parliament:concerns-document:1:example" },
+      })),
+    };
+    const mixed = { ...graph, edges: [graph.edges[0], interest] };
+    const result = filterNetwork(mixed, {
+      query: "",
+      predicate: "",
+      date: "",
+      includeInactive: true,
+      declaredInterestsOnly: true,
+    });
+    expect(result.edges).toEqual([interest]);
+    expect(result.nodes).toEqual(graph.nodes);
   });
   it("bounds the visual graph without creating dangling edges or changing input", () => {
     const limited = networkWindow(graph, 1);

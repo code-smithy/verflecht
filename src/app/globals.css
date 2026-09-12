@@ -78,6 +78,10 @@ p {
   height: 18px;
   accent-color: #1466b8;
 }
+.interest-filter {
+  color: #0b4f88;
+  font-weight: 700;
+}
 label {
   display: grid;
   gap: 8px;
