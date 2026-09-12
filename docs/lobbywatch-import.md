@@ -1,6 +1,6 @@
 # Lobbywatch import
 
-Lobbywatch is the second external source. Its public export adds declared interests, professional and organisational mandates, and parliamentary access badges. Lobbywatch is an organisation source, not an official primary source, so every generated relationship has status `PENDING_REVIEW`; the adapter never publishes or verifies its own claims.
+Lobbywatch is the second external source. Its public export adds declared interests, professional and organisational mandates, and parliamentary access badges. Lobbywatch is an organisation source, not an official primary source, so its generated relationships have status `PENDING_REVIEW`; the adapter never verifies its own claims. A separate corroborator publishes only the subset that exactly matches structured declarations fetched directly from the official Parliament API.
 
 The adapter downloads Lobbywatch's weekly aggregated JSON ZIP from the [data export page](https://lobbywatch.ch/datenexport/). Lobbywatch documents the export as CC BY-SA 4.0. The unchanged ZIP, its SHA-256 checksum, retrieval metadata, and replaced versions stay in ignored `data/raw/lobbywatch/`.
 
@@ -29,11 +29,14 @@ Only selected relationship fields are serialized into evidence documents. Privat
 python import_lobbywatch.py
 python import_lobbywatch.py --status
 python import_lobbywatch.py --normalize-only
+python verify_lobbywatch.py
 ```
 
 An interrupted download leaves `lobbywatch-export.zip.part` and resumes with an HTTP range request. A server that does not honor ranges causes a safe full restart. Conditional requests avoid replacing an unchanged completed snapshot. Changed completed ZIPs are retained under `data/raw/lobbywatch/versions/`.
 
-The generated `data/imports/lobbywatch/research.json` is merged by the normal offline build. Because all claims are candidates, importing alone does not change the public graph.
+The generated `data/imports/lobbywatch/research.json` is merged by the normal offline build. Because all of its claims are candidates, importing alone does not change the public graph. `verify_lobbywatch.py` fetches each matched officeholder's current official `concerns` array and writes independently evidenced claims to `data/imports/lobbywatch-verified/research.json`. The normal build discovers that generated import automatically.
+
+Automatic corroboration requires exactly one current Lobbywatch interest with the same Parliament biography ID, normalized organisation name, and explicitly mapped role. It does not use fuzzy matching, does not copy Lobbywatch dates into official claims, and does not verify access badges. Unmatched, ambiguous, and unsupported roles stay private and are counted in `data/imports/lobbywatch-verified/verification-report.json`; its Markdown companion appears in the Action summary and on the review branch.
 
 Each relationship uses its Lobbywatch record ID as a stable lineage and its normalized contents as a version ID. When a record changes, the new candidate supersedes the previous version. When it disappears from Lobbywatch's current-parliament export, the previous version and its evidence remain in the generated dataset as `OUTDATED`. A later reappearance cannot create a supersession cycle.
 
@@ -48,6 +51,6 @@ The command copies the claim, its exact evidence document, source attribution, a
 
 ## GitHub Actions
 
-`Import Lobbywatch` runs at 04:41 UTC each Monday, after Lobbywatch's documented early-Monday export refresh. It restores the raw checkpoint, resumes or conditionally checks the export, generates candidates, saves the checkpoint, and uploads the raw archive and report for 14 days. On `main`, changed candidates are committed and normal CI is dispatched.
+`Import Lobbywatch` runs at 04:41 UTC each Monday, after Lobbywatch's documented early-Monday export refresh. It restores the raw checkpoint, resumes or conditionally checks the export, generates candidates, fetches official Parliament declarations, creates exact verified matches, rebuilds the graph, saves the checkpoint, and uploads the raw archive and reports for 14 days. Meaningful changes are committed to the reusable `codex/lobbywatch-refresh` review branch instead of being pushed directly to `main`. The Action dispatches CI for that branch and puts a one-click compare/pull-request link in its summary. An already-open pull request updates automatically; after it has been merged, the next meaningful refresh needs one click to open the new review. Merging publishes the static site through the normal `main` build.
 
-The Action never changes a candidate to `VERIFIED`. New officeholders join automatically through `parlament_biografie_id`; ambiguous or incomplete records are reported rather than name-matched. The raw cache retains replaced ZIPs, while versioned generated claims preserve relationships that leave the current export.
+The Action never treats Lobbywatch as verification. New officeholders join automatically through `parlament_biografie_id`; only unique exact matches receive separate official `VERIFIED` claims with `automatic:ch-parliament-official-api` provenance. Ambiguous or incomplete records are reported. The raw cache retains replaced ZIPs, while generated claims that lose their exact official match are retained as non-public `OUTDATED` history.

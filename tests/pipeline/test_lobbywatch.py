@@ -11,6 +11,7 @@ from pipeline.json_store import read_dataset
 from pipeline.lobbywatch import (DATA_MEMBER, EXPORT_FILENAME, SOURCE,
                                  download_export, materialize, validate_archive)
 from pipeline.lobbywatch_review import review_claims
+from pipeline.lobbywatch_verify import canonical_name, concern_predicate, corroborate
 
 
 def export_bytes(records):
@@ -202,6 +203,91 @@ class LobbywatchTests(unittest.TestCase):
                 archive.writestr("unexpected.json", "[]")
             with self.assertRaisesRegex(ValueError, DATA_MEMBER):
                 validate_archive(path)
+
+    def test_official_exact_interest_match_is_published_without_lobbywatch_dates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "raw"
+            archive.mkdir()
+            imported_path = Path(directory) / "candidate.json"
+            verified_path = Path(directory) / "verified/research.json"
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(self.fixture()))
+            materialize(archive, imported_path)
+            report = corroborate(imported_path, verified_path, {4051: {
+                "id": 4051,
+                "updated": "2026-09-12T12:00:00Z",
+                "firstName": "Thomas",
+                "lastName": "Beispiel",
+                "concerns": [{
+                    "name": "Beispiel AG",
+                    "organizationType": "VR",
+                    "function": "P",
+                    "agency": "F",
+                    "type": "AG",
+                }],
+            }})
+            verified = read_dataset(verified_path)
+
+            self.assertEqual(report["verified_exact_matches"], 1)
+            self.assertEqual(len(verified["claims"]), 1)
+            claim = verified["claims"][0]
+            self.assertEqual(claim["status"], "VERIFIED")
+            self.assertEqual(claim["reviewed_by"], "automatic:ch-parliament-official-api")
+            self.assertIsNone(claim["valid_from"])
+            self.assertEqual(claim["corroborates_claim_id"].split(":")[2], "interests")
+            from pipeline.build import project
+            self.assertEqual(len(project(verified)["edges"]), 1)
+
+    def test_official_mismatch_and_ambiguous_candidates_stay_private(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "raw"
+            archive.mkdir()
+            imported_path = Path(directory) / "candidate.json"
+            verified_path = Path(directory) / "verified/research.json"
+            fixture = self.fixture()
+            duplicate = json.loads(json.dumps(fixture[0]["interessenbindungen"][0]))
+            duplicate["id"] = 31
+            fixture[0]["interessenbindungen"].append(duplicate)
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(fixture))
+            materialize(archive, imported_path)
+            report = corroborate(imported_path, verified_path, {4051: {
+                "id": 4051,
+                "updated": "2026-09-12T12:00:00Z",
+                "concerns": [
+                    {"name": "Beispiel AG", "organizationType": "VR", "function": "P"},
+                    {"name": "Unbekannt AG", "organizationType": "VR", "function": "M"},
+                ],
+            }})
+
+            self.assertEqual(report["verified_exact_matches"], 0)
+            self.assertEqual(report["ambiguous_matches"], 1)
+            self.assertEqual(report["unmatched_official_concerns"], 1)
+            self.assertEqual(read_dataset(verified_path)["claims"], [])
+
+    def test_official_role_and_name_normalization_is_conservative(self):
+        self.assertEqual(canonical_name("  Société & Partner  "), "societe und partner")
+        self.assertEqual(concern_predicate({"function": "VP", "organizationType": "VR"}),
+                         "VICE_PRESIDENT_OF")
+        self.assertEqual(concern_predicate({"function": "M", "organizationType": "Bei."}),
+                         "HAS_MANDATE_AT")
+        self.assertIsNone(concern_predicate({"function": "Sek.", "organizationType": "V"}))
+
+    def test_duplicate_official_rows_are_not_automatically_published(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "raw"
+            archive.mkdir()
+            imported_path = Path(directory) / "candidate.json"
+            verified_path = Path(directory) / "verified/research.json"
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(self.fixture()))
+            materialize(archive, imported_path)
+            concern = {"name": "Beispiel AG", "organizationType": "VR", "function": "P"}
+            report = corroborate(imported_path, verified_path, {4051: {
+                "id": 4051, "updated": "2026-09-12T12:00:00Z",
+                "concerns": [concern, dict(concern)],
+            }})
+
+            self.assertEqual(report["verified_exact_matches"], 0)
+            self.assertEqual(report["ambiguous_matches"], 2)
+            self.assertEqual(read_dataset(verified_path)["claims"], [])
 
 
 if __name__ == "__main__":

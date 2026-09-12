@@ -40,7 +40,12 @@ jobs:
       - name: Import weekly export
         run: python import_lobbywatch.py
 
-      - name: Save raw snapshot checkpoint
+      - name: Corroborate against official Parliament declarations
+        run: |
+          python verify_lobbywatch.py
+          python build_data_pipeline.py
+
+      - name: Save raw snapshot and official-response checkpoint
         if: always() && hashFiles('data/raw/lobbywatch/manifest.json') != ''
         uses: actions/cache/save@v4
         with:
@@ -53,26 +58,34 @@ jobs:
           name: lobbywatch-import-${{ github.run_id }}
           path: |
             data/imports/lobbywatch
+            data/imports/lobbywatch-verified
             data/raw/lobbywatch/manifest.json
             data/raw/lobbywatch/lobbywatch-export.zip
+            data/raw/lobbywatch/parliament
           retention-days: 14
           compression-level: 0
 
       - name: Write summary
-        run: |
-          echo "## Lobbywatch candidate refresh" >> "$GITHUB_STEP_SUMMARY"
-          echo "All imported relationships remain PENDING_REVIEW. See the normalization report artifact for counts and skipped records." >> "$GITHUB_STEP_SUMMARY"
+        if: success() && hashFiles('data/imports/lobbywatch-verified/verification-report.md') != ''
+        run: cat data/imports/lobbywatch-verified/verification-report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit changed candidates
+      - name: Publish review branch
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/imports/lobbywatch
+          git add data/imports/lobbywatch data/imports/lobbywatch-verified public/data/graph.json
           if ! git diff --cached --quiet; then
-            git commit -m "Refresh Lobbywatch review candidates"
-            git push origin HEAD:main
-            gh workflow run ci.yml --ref main
+            branch="codex/lobbywatch-refresh"
+            git fetch origin "$branch:refs/remotes/origin/$branch" || true
+            git checkout -B "$branch"
+            git commit -m "Refresh and corroborate Lobbywatch data"
+            git push --force-with-lease origin "HEAD:refs/heads/$branch"
+            gh workflow run ci.yml --ref "$branch"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "[Create or view the review pull request](https://github.com/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No source or verification changes; no review branch update needed." >> "$GITHUB_STEP_SUMMARY"
           fi

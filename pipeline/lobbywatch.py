@@ -231,6 +231,14 @@ def materialize(archive, output):
     previous = read_dataset(output) if output.exists() else {
         "schema_version": 1, "sources": [], "documents": [], "entities": [], "claims": [],
     }
+    # A cold CI cache can download an unchanged export again. Preserve the first
+    # observation time so a byte-identical snapshot does not create a noisy PR.
+    same_snapshot_times = {
+        item.get("retrieved_at") for item in previous.get("documents", [])
+        if item.get("raw_sha256") == snapshot_sha and isinstance(item.get("retrieved_at"), str)
+    }
+    if same_snapshot_times:
+        retrieved_at = min(same_snapshot_times)
     previous_documents = {item["id"]: item for item in previous.get("documents", [])}
     previous_entities = {item["id"]: item for item in previous.get("entities", [])}
     previous_by_lineage = {}
