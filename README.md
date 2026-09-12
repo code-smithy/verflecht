@@ -31,7 +31,9 @@ data/research.json → Python validation and projection → public/data/graph.js
 
 The pipeline follows the local build and browser-ready export pattern of [russianinfra](https://github.com/code-smithy/russianinfra). The build itself stays offline. The [Swiss Parliament importer](docs/parliament-import.md) separately archives all four language versions. It automatically publishes explicit council and committee memberships, active-member party/faction affiliations, affair authorship, catalogued affair topics, and leading departments returned by the official API. It does not infer relationships from votes, text, or co-occurrence.
 
-The importer runs once per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, commits the full normalised dataset and public graph, and stops. If the initial Parliament archive is incomplete, the next nightly run resumes it. A data change triggers the Pages build.
+The Parliament importer runs once per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, commits the full normalised dataset and public graph, and stops. If the initial Parliament archive is incomplete, the next nightly run resumes it. A data change triggers the Pages build.
+
+The [Lobbywatch adapter](docs/lobbywatch-import.md) downloads its weekly public export, joins parliamentarians through their Parliament biography IDs, and creates evidence-backed review candidates for declared interests, mandates, and access badges. As an organisation source, Lobbywatch never automatically verifies or publishes its own relationships.
 
 ## Commands
 
@@ -41,6 +43,7 @@ python build_data_pipeline.py --check                 # Validate and detect stal
 python build_data_pipeline.py --input path/to/research.json --output path/to/graph.json
 pnpm test:pipeline                                   # Python standard-library tests
 pnpm data:import:parliament                           # Import/refresh all Parliament records
+pnpm data:import:lobbywatch                           # Download Lobbywatch and build review candidates
 pnpm test                                            # Frontend data-contract tests
 pnpm typecheck
 pnpm lint

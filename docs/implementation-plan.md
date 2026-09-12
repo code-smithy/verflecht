@@ -18,6 +18,15 @@
 - Resume an incomplete archive during the next nightly run.
 - Manual dispatch selects one language or all languages and defaults to a 15-minute budget; no self-dispatched continuations.
 
+## Implemented: Lobbywatch source adapter
+
+- Download and resume Lobbywatch's weekly aggregated JSON export.
+- Join parliamentarians to official Parliament entities using stable biography IDs.
+- Generate evidence-backed, `PENDING_REVIEW` candidates for interests, mandates, and access badges.
+- Preserve CC BY-SA provenance and exclude contact/address fields from generated candidates.
+
+Next, add reviewer-friendly identity and claim triage before scheduling or publishing Lobbywatch updates.
+
 ## Next: add further sources
 
 All multilingual adapters must use separate language jobs, checkpoints and snapshots, with single-language manual runs and all-language nightly runs. Follow [the import conventions](import-conventions.md). Parliament now follows this model.

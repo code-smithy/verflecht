@@ -12,3 +12,5 @@ All future multilingual source importers must follow this contract:
 8. Include source/language progress and retrieval dates in reports. Document cache migration and recovery.
 
 The Parliament workflow and `pipeline.language_import.configuration` provide the initial selection/budget pattern. Its `combine` implementation is Parliament-specific: another source must define its own evidence policy rather than inherit German-only publication by accident.
+
+This separation applies when a source exposes independently fetched language resources. Lobbywatch instead publishes one atomic weekly archive containing its available German and French fields; its adapter therefore keeps one checkpoint and snapshot. Splitting that identical archive into language jobs would duplicate network and mutable state without adding isolation.
