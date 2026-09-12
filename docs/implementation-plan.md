@@ -24,8 +24,10 @@
 - Join parliamentarians to official Parliament entities using stable biography IDs.
 - Generate evidence-backed, `PENDING_REVIEW` candidates for interests, mandates, and access badges.
 - Preserve CC BY-SA provenance and exclude contact/address fields from generated candidates.
+- Preserve changed and removed candidate versions, and promote explicit review decisions into authored research.
+- Refresh candidates in a weekly GitHub Action without automatically publishing them.
 
-Next, add reviewer-friendly identity and claim triage before scheduling or publishing Lobbywatch updates.
+Next, add a reviewer-friendly claim triage interface over the explicit promotion contract.
 
 ## Next: add further sources
 

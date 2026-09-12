@@ -1,0 +1,78 @@
+name: Import Lobbywatch
+
+on:
+  schedule:
+    # Lobbywatch refreshes its public export early on Monday.
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lobbywatch-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test Lobbywatch adapter
+        run: python -m unittest tests.pipeline.test_lobbywatch -v
+
+      - name: Restore raw snapshots and partial download
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw/lobbywatch
+          key: lobbywatch-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: lobbywatch-v1-
+
+      - name: Import weekly export
+        run: python import_lobbywatch.py
+
+      - name: Save raw snapshot checkpoint
+        if: always() && hashFiles('data/raw/lobbywatch/manifest.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/lobbywatch
+          key: lobbywatch-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload candidates and source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: lobbywatch-import-${{ github.run_id }}
+          path: |
+            data/imports/lobbywatch
+            data/raw/lobbywatch/manifest.json
+            data/raw/lobbywatch/lobbywatch-export.zip
+          retention-days: 14
+          compression-level: 0
+
+      - name: Write summary
+        run: |
+          echo "## Lobbywatch candidate refresh" >> "$GITHUB_STEP_SUMMARY"
+          echo "All imported relationships remain PENDING_REVIEW. See the normalization report artifact for counts and skipped records." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit changed candidates
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/imports/lobbywatch
+          if ! git diff --cached --quiet; then
+            git commit -m "Refresh Lobbywatch review candidates"
+            git push origin HEAD:main
+            gh workflow run ci.yml --ref main
+          fi

@@ -33,4 +33,21 @@ python import_lobbywatch.py --normalize-only
 
 An interrupted download leaves `lobbywatch-export.zip.part` and resumes with an HTTP range request. A server that does not honor ranges causes a safe full restart. Conditional requests avoid replacing an unchanged completed snapshot. Changed completed ZIPs are retained under `data/raw/lobbywatch/versions/`.
 
-The generated `data/imports/lobbywatch/research.json` is merged by the normal offline build. Because all claims are candidates, importing alone does not change the public graph. Verification remains a separate human-reviewed edit with source evidence and review metadata.
+The generated `data/imports/lobbywatch/research.json` is merged by the normal offline build. Because all claims are candidates, importing alone does not change the public graph.
+
+Each relationship uses its Lobbywatch record ID as a stable lineage and its normalized contents as a version ID. When a record changes, the new candidate supersedes the previous version. When it disappears from Lobbywatch's current-parliament export, the previous version and its evidence remain in the generated dataset as `OUTDATED`. A later reappearance cannot create a supersession cycle.
+
+Generated imports must not be edited. Record a review decision in authored `data/research.json` instead:
+
+```sh
+python review_lobbywatch.py --decision VERIFIED --reviewer "reviewer-id" "lobbywatch:claim:..."
+python review_lobbywatch.py --decision REJECTED --reviewer "reviewer-id" "lobbywatch:claim:..."
+```
+
+The command copies the claim, its exact evidence document, source attribution, and referenced entities into authored research, adds review metadata, validates the fully merged graph, and then writes atomically. It refuses to overwrite an existing authored decision. Later imports cannot replace authored records with the same ID.
+
+## GitHub Actions
+
+`Import Lobbywatch` runs at 04:41 UTC each Monday, after Lobbywatch's documented early-Monday export refresh. It restores the raw checkpoint, resumes or conditionally checks the export, generates candidates, saves the checkpoint, and uploads the raw archive and report for 14 days. On `main`, changed candidates are committed and normal CI is dispatched.
+
+The Action never changes a candidate to `VERIFIED`. New officeholders join automatically through `parlament_biografie_id`; ambiguous or incomplete records are reported rather than name-matched. The raw cache retains replaced ZIPs, while versioned generated claims preserve relationships that leave the current export.

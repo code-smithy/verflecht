@@ -33,7 +33,7 @@ The pipeline follows the local build and browser-ready export pattern of [russia
 
 The Parliament importer runs once per night. Each run restores its checkpoint, collects data for a bounded period, saves its progress, commits the full normalised dataset and public graph, and stops. If the initial Parliament archive is incomplete, the next nightly run resumes it. A data change triggers the Pages build.
 
-The [Lobbywatch adapter](docs/lobbywatch-import.md) downloads its weekly public export, joins parliamentarians through their Parliament biography IDs, and creates evidence-backed review candidates for declared interests, mandates, and access badges. As an organisation source, Lobbywatch never automatically verifies or publishes its own relationships.
+The weekly [Lobbywatch adapter](docs/lobbywatch-import.md) downloads its public export, joins parliamentarians through their Parliament biography IDs, and creates versioned, evidence-backed review candidates for declared interests, mandates, and access badges. Removed source records are retained as outdated history. As an organisation source, Lobbywatch never automatically verifies or publishes its own relationships; explicit decisions are promoted to authored research.
 
 ## Commands
 
@@ -44,6 +44,7 @@ python build_data_pipeline.py --input path/to/research.json --output path/to/gra
 pnpm test:pipeline                                   # Python standard-library tests
 pnpm data:import:parliament                           # Import/refresh all Parliament records
 pnpm data:import:lobbywatch                           # Download Lobbywatch and build review candidates
+pnpm data:review:lobbywatch -- --help                 # Promote explicit review decisions to authored research
 pnpm test                                            # Frontend data-contract tests
 pnpm typecheck
 pnpm lint

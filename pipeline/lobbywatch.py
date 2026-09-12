@@ -1,6 +1,7 @@
 """Resumable Lobbywatch export download and conservative candidate projection."""
 
 from datetime import date, datetime, timezone
+import copy
 import hashlib
 import io
 import json
@@ -12,7 +13,7 @@ from urllib.request import Request, urlopen
 import zipfile
 
 from pipeline.build import project, require
-from pipeline.json_store import write_dataset
+from pipeline.json_store import read_dataset, write_dataset
 from pipeline.parliament import atomic_json, encode
 
 
@@ -227,6 +228,18 @@ def materialize(archive, output):
     manifest = _saved_manifest(archive / "manifest.json")
     snapshot_sha = sha256_file(export)
     retrieved_at = manifest.get("retrieved_at") or utc_now()
+    previous = read_dataset(output) if output.exists() else {
+        "schema_version": 1, "sources": [], "documents": [], "entities": [], "claims": [],
+    }
+    previous_documents = {item["id"]: item for item in previous.get("documents", [])}
+    previous_entities = {item["id"]: item for item in previous.get("entities", [])}
+    previous_by_lineage = {}
+    for item in previous.get("claims", []):
+        lineage = item.get("lineage_id")
+        if isinstance(lineage, str):
+            previous_by_lineage.setdefault(lineage, []).append(item)
+    for versions in previous_by_lineage.values():
+        versions.sort(key=lambda item: (item.get("snapshot_retrieved_at", ""), item["id"]))
     entities, documents, claims = {}, {}, {}
     skipped = []
     counts = {"interests": 0, "badges": 0, "badge_mandates": 0}
@@ -263,14 +276,26 @@ def materialize(archive, output):
         excerpt = _evidence(record, subject_key)
         excerpts.append(excerpt)
         classification = "HISTORICAL" if end else "OFFICIAL" if record.get("behoerden_vertreter") == "J" else "DIRECT"
-        claim_id = f"lobbywatch:claim:{kind}:{record_id}"
+        predicate = _predicate(record)
+        lineage = f"lobbywatch:{kind}:{record_id}"
+        identity = encode([subject, target, predicate, start, end, excerpt])
+        claim_id = f"lobbywatch:claim:{kind}:{record_id}:{hashlib.sha256(identity.encode()).hexdigest()[:16]}"
+        versions = previous_by_lineage.get(lineage, [])
+        if any(item["id"] == claim_id for item in versions) and versions[-1]["id"] != claim_id:
+            # A source value can revert to an older value. Give that occurrence
+            # a fresh ID rather than creating a supersession cycle.
+            claim_id += f":{snapshot_sha[:8]}"
         claims[claim_id] = {
             "id": claim_id, "subject_id": subject, "object_id": target,
-            "predicate": _predicate(record), "connection_class": classification,
+            "predicate": predicate, "connection_class": classification,
             "valid_from": start, "valid_to": end, "status": "PENDING_REVIEW",
             "evidence": [{"document_id": document_id, "text": excerpt}],
             "imported_from": EXPORT_URL, "retrieved_at": retrieved_at,
+            "lineage_id": lineage, "snapshot_retrieved_at": retrieved_at,
         }
+        older = [item for item in versions if item["id"] != claim_id]
+        if older:
+            claims[claim_id]["supersedes_id"] = older[-1]["id"]
         counts[kind] += 1
 
     for parliamentarian in records:
@@ -329,7 +354,12 @@ def materialize(archive, output):
                 if key in badge
             })
             excerpts.append(badge_excerpt)
-            claim_id = f"lobbywatch:claim:badge:{badge_id}"
+            lineage = f"lobbywatch:badge:{badge_id}"
+            identity = encode([person, badge_person, "ISSUED_ACCESS_BADGE_TO", start, end, badge_excerpt])
+            claim_id = f"lobbywatch:claim:badge:{badge_id}:{hashlib.sha256(identity.encode()).hexdigest()[:16]}"
+            versions = previous_by_lineage.get(lineage, [])
+            if any(item["id"] == claim_id for item in versions) and versions[-1]["id"] != claim_id:
+                claim_id += f":{snapshot_sha[:8]}"
             claims[claim_id] = {
                 "id": claim_id, "subject_id": person, "object_id": badge_person,
                 "predicate": "ISSUED_ACCESS_BADGE_TO",
@@ -337,7 +367,11 @@ def materialize(archive, output):
                 "valid_from": start, "valid_to": end, "status": "PENDING_REVIEW",
                 "evidence": [{"document_id": document_id, "text": badge_excerpt}],
                 "imported_from": EXPORT_URL, "retrieved_at": retrieved_at,
+                "lineage_id": lineage, "snapshot_retrieved_at": retrieved_at,
             }
+            older = [item for item in versions if item["id"] != claim_id]
+            if older:
+                claims[claim_id]["supersedes_id"] = older[-1]["id"]
             counts["badges"] += 1
             for mandate in badge.get("mandate") or []:
                 if not isinstance(mandate, dict) or not isinstance(mandate.get("organisation"), dict):
@@ -360,6 +394,26 @@ def materialize(archive, output):
                 "license": SOURCE["license"], "license_url": SOURCE["license_url"],
             }
 
+    retained_outdated = 0
+    for prior in previous.get("claims", []):
+        if prior["id"] in claims:
+            continue
+        retained = copy.deepcopy(prior)
+        retained["status"] = "OUTDATED"
+        retained.pop("reviewed_by", None)
+        retained.pop("reviewed_at", None)
+        retained.setdefault("missing_from_snapshot", snapshot_sha)
+        claims[retained["id"]] = retained
+        for key in ("subject_id", "object_id"):
+            identifier = retained[key]
+            if identifier not in entities and identifier in previous_entities:
+                entities[identifier] = copy.deepcopy(previous_entities[identifier])
+        for evidence in retained.get("evidence", []):
+            identifier = evidence.get("document_id")
+            if identifier not in documents and identifier in previous_documents:
+                documents[identifier] = copy.deepcopy(previous_documents[identifier])
+        retained_outdated += 1
+
     dataset = {
         "schema_version": 1, "sources": [SOURCE],
         "documents": [documents[key] for key in sorted(documents)],
@@ -373,6 +427,7 @@ def materialize(archive, output):
         "retrieved_at": retrieved_at, "parliamentarians": len(records),
         "entities": len(entities), "documents": len(documents),
         "candidate_claims": len(claims), **counts,
+        "retained_outdated_claims": retained_outdated,
         "skipped": skipped,
         "note": "All Lobbywatch relationships are PENDING_REVIEW; none are automatically published.",
     }

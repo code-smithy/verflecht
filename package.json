@@ -12,6 +12,7 @@
     "data:check": "python build_data_pipeline.py --check",
     "data:import:lobbywatch": "python import_lobbywatch.py",
     "data:import:parliament": "python import_parliament.py --refresh",
+    "data:review:lobbywatch": "python review_lobbywatch.py",
     "test:pipeline": "python -m unittest discover -s tests/pipeline -v",
     "predev": "pnpm data:build",
     "prebuild": "pnpm data:build",

@@ -10,6 +10,7 @@ import zipfile
 from pipeline.json_store import read_dataset
 from pipeline.lobbywatch import (DATA_MEMBER, EXPORT_FILENAME, SOURCE,
                                  download_export, materialize, validate_archive)
+from pipeline.lobbywatch_review import review_claims
 
 
 def export_bytes(records):
@@ -134,6 +135,65 @@ class LobbywatchTests(unittest.TestCase):
             # PENDING_REVIEW candidates validate but produce no public edges.
             from pipeline.build import project
             self.assertEqual(project(dataset)["edges"], [])
+
+    def test_changed_and_removed_candidates_keep_a_historical_lineage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "raw"
+            archive.mkdir()
+            output = Path(directory) / "research.json"
+            first = self.fixture()
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(first))
+            materialize(archive, output)
+            original = read_dataset(output)
+            original_interest = next(item for item in original["claims"]
+                                     if item["lineage_id"] == "lobbywatch:interests:30")
+
+            changed = self.fixture()
+            changed[0]["interessenbindungen"][0]["funktion_im_gremium"] = "vizepraesident"
+            changed[0]["zutrittsberechtigungen"] = []
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(changed))
+            report = materialize(archive, output)
+            current = read_dataset(output)
+            lineage = [item for item in current["claims"]
+                       if item["lineage_id"] == "lobbywatch:interests:30"]
+
+            self.assertEqual(len(lineage), 2)
+            replacement = next(item for item in lineage if item["status"] == "PENDING_REVIEW")
+            self.assertEqual(replacement["predicate"], "VICE_PRESIDENT_OF")
+            self.assertEqual(replacement["supersedes_id"], original_interest["id"])
+            self.assertEqual(next(item for item in lineage if item["id"] == original_interest["id"])["status"],
+                             "OUTDATED")
+            self.assertEqual(report["retained_outdated_claims"], 3)
+
+    def test_review_decisions_are_copied_to_authored_research(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "raw"
+            archive.mkdir()
+            imported_path = Path(directory) / "imported.json"
+            authored_path = Path(directory) / "authored.json"
+            (archive / EXPORT_FILENAME).write_bytes(export_bytes(self.fixture()))
+            materialize(archive, imported_path)
+            imported = read_dataset(imported_path)
+            authored_path.write_text(json.dumps({
+                "schema_version": 1, "sources": [], "documents": [], "entities": [], "claims": [],
+            }), encoding="utf-8")
+            interest = next(item for item in imported["claims"] if item["lineage_id"] == "lobbywatch:interests:30")
+            badge = next(item for item in imported["claims"] if item["lineage_id"] == "lobbywatch:badge:60")
+
+            review_claims(imported_path, authored_path, [interest["id"]], "VERIFIED", "reviewer-1",
+                          "2026-09-12T12:00:00+00:00")
+            review_claims(imported_path, authored_path, [badge["id"]], "REJECTED", "reviewer-1",
+                          "2026-09-12T12:01:00+00:00")
+
+            authored = read_dataset(authored_path)
+            decisions = {item["id"]: item for item in authored["claims"]}
+            self.assertEqual(decisions[interest["id"]]["status"], "VERIFIED")
+            self.assertEqual(decisions[badge["id"]]["status"], "REJECTED")
+            from pipeline.build import merge_research, project
+            self.assertEqual([item["id"] for item in project(merge_research(authored, [imported]))["edges"]],
+                             [interest["id"]])
+            with self.assertRaisesRegex(ValueError, "authored decision"):
+                review_claims(imported_path, authored_path, [interest["id"]], "VERIFIED", "reviewer-2")
 
     def test_invalid_archive_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
