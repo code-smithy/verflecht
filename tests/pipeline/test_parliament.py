@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 
 from pipeline.build import ValidationError, merge_research, project
-from pipeline.parliament import (AccessDenied, BudgetReached, Client, ImportFailure,
+from pipeline.parliament import (AccessDenied, BudgetReached, Client, ImportFailure, NotFound,
+                                RequestTimedOut,
                                 Resource, encode, has_more, import_archive,
                                 page_fingerprint, request_url, retry_seconds)
 from pipeline.parliament_normalize import materialize
@@ -97,6 +98,37 @@ class ParliamentTests(unittest.TestCase):
             self.assertEqual(len(state["errors"]), 2)
             self.assertFalse(client.cache_path(request_url("councillors/1", "de")).exists())
 
+    def test_missing_legacy_detail_is_recorded_without_poisoning_resumed_runs(self):
+        responses = {request_url("councillors", "de", 1): [{"id": 1}]}
+        with tempfile.TemporaryDirectory() as directory:
+            client = self.client(directory, responses)
+            client.download.side_effect = [encode([{"id": 1}]).encode(), NotFound("HTTP 404: missing detail")]
+            resources = (Resource("councillors", "councillors"),)
+
+            state = import_archive(directory, ["de"], workers=1, resources=resources, client=client)
+
+            self.assertEqual(state["status"], "complete")
+            self.assertEqual(state["errors"], [])
+            self.assertEqual(len(state["unavailable_details"]), 1)
+            self.assertEqual(state["details"]["de/councillors"],
+                             {"total": 1, "completed": 0, "unavailable": 1})
+
+    def test_timed_out_vote_detail_is_quarantined_and_resumed_without_a_request(self):
+        responses = {request_url("votes/affairs", "de", 1): [{"id": 1}]}
+        with tempfile.TemporaryDirectory() as directory:
+            client = self.client(directory, responses)
+            client.download.side_effect = [encode([{"id": 1}]).encode(), RequestTimedOut("read operation timed out")]
+            resources = (Resource("votes/affairs", "votes/affairs"),)
+
+            first = import_archive(directory, ["de"], workers=1, resources=resources, client=client)
+            resumed = self.client(directory, responses)
+            second = import_archive(directory, ["de"], workers=1, resources=resources, client=resumed)
+
+            self.assertEqual(first["status"], "complete")
+            self.assertEqual(second["status"], "complete")
+            self.assertEqual(second["details"]["de/votes/affairs"]["unavailable"], 1)
+            resumed.download.assert_not_called()
+
     def test_html_errors_and_corrupted_cache_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             client = self.client(directory, {})
@@ -119,6 +151,23 @@ class ParliamentTests(unittest.TestCase):
                     client.download("https://ws-old.parlament.ch/")
                 self.assertEqual(request.call_count, 1)
                 self.assertTrue(client.stop.is_set())
+
+    def test_http_404_is_a_permanent_missing_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client = Client(directory, interval=0)
+            with patch("pipeline.parliament.urlopen", side_effect=HTTPError("https://ws-old.parlament.ch/missing", 404, "Not Found", {}, None)) as request:
+                with self.assertRaises(NotFound):
+                    client.download("https://ws-old.parlament.ch/missing")
+                self.assertEqual(request.call_count, 1)
+                self.assertFalse(client.stop.is_set())
+
+    def test_exhausted_timeout_retries_are_classified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client = Client(directory, interval=0, retries=1)
+            with patch("pipeline.parliament.urlopen", side_effect=TimeoutError("read operation timed out")) as request:
+                with self.assertRaises(RequestTimedOut):
+                    client.download("https://ws-old.parlament.ch/slow")
+                self.assertEqual(request.call_count, 2)
 
     def test_runtime_budget_and_retry_after(self):
         self.assertEqual(retry_seconds("30", 2), 30)

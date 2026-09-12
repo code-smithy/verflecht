@@ -57,7 +57,7 @@ python import_parliament.py --max-requests 100
 python import_parliament.py --languages de fr it en --workers 4 --interval 0.2
 ```
 
-The default rate is at most five request starts per second across four workers, reduced further by response latency, `robots.txt`, retries, and `Retry-After`. Access denial stops the run. No credentials or access-control bypass is used. Pausing at an explicit request/time limit exits successfully so the workflow can save its checkpoint; other incomplete or blocked imports exit unsuccessfully. The report distinguishes these outcomes.
+The default rate is at most five request starts per second across four workers, reduced further by response latency, `robots.txt`, retries, and `Retry-After`. Access denial stops the run. No credentials or access-control bypass is used. Pausing at an explicit request/time limit exits successfully so the workflow can save its checkpoint; other incomplete or blocked imports exit unsuccessfully. Historic list records whose detail route permanently returns HTTP 404 are reported as unavailable. Vote-detail responses that still time out after all retries are quarantined for seven days before another attempt. These unavailable records do not make every resumed run fail. The report distinguishes these outcomes.
 
 ## Files
 

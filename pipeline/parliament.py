@@ -7,7 +7,7 @@ archive directory for a fresh snapshot, or reuse one to resume an interrupted ru
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import gzip
 import hashlib
@@ -132,6 +132,14 @@ class AccessDenied(ImportFailure):
     pass
 
 
+class NotFound(ImportFailure):
+    """A collection record has no corresponding legacy detail response."""
+
+
+class RequestTimedOut(ImportFailure):
+    """A request did not return after all retries."""
+
+
 class BudgetReached(ImportFailure):
     pass
 
@@ -187,6 +195,8 @@ class Client:
                 if error.code in (401, 403):
                     self.stop.set()
                     raise AccessDenied(f"HTTP {error.code}: {url}; access denied, no bypass attempted") from error
+                if error.code == 404:
+                    raise NotFound(f"HTTP 404: {url}") from error
                 if error.code not in (408, 429, 500, 502, 503, 504) or attempt == self.retries:
                     raise ImportFailure(f"HTTP {error.code}: {url}") from error
                 delay = retry_seconds(error.headers.get("Retry-After"), 2 ** (attempt + 1))
@@ -195,7 +205,8 @@ class Client:
                     self.next_request = max(self.next_request, time.monotonic() + delay)
             except (URLError, TimeoutError, ConnectionError, OSError) as error:
                 if attempt == self.retries:
-                    raise ImportFailure(f"request failed: {url}: {error}") from error
+                    failure = RequestTimedOut if isinstance(error, TimeoutError) else ImportFailure
+                    raise failure(f"request failed: {url}: {error}") from error
                 with self.lock:
                     self.next_request = max(self.next_request, time.monotonic() + 2 ** (attempt + 1))
         raise ImportFailure(f"request failed: {url}")
@@ -204,9 +215,7 @@ class Client:
         # Missing robots.txt means there are no published crawler rules.
         try:
             body = self.download(BASE_URL + "/robots.txt", "text/plain")
-        except ImportFailure as error:
-            if not str(error).startswith("HTTP 404:"):
-                raise
+        except NotFound:
             return
         self.robots = RobotFileParser()
         self.robots.parse(body.decode("utf-8-sig").splitlines())
@@ -315,11 +324,26 @@ def import_archive(archive, languages=LANGUAGES, workers=4, interval=0.2, max_re
     client = client or Client(archive, interval=interval, max_requests=max_requests, max_seconds=max_seconds)
     state = {"source": BASE_URL, "started_at": utc_now(), "status": "running",
              "languages": list(languages), "collections": {}, "details": {}, "errors": [],
+             "unavailable_details": [],
              "unavailable_views": {"parties": "HTTP 404; parties/historic is imported", "votes": "No default view; both vote views are imported"}}
     state_lock = threading.Lock()
     detail_tasks = {}
     previous = archive / "manifest.json"
     previous_state = json.loads(previous.read_text(encoding="utf-8")) if previous.exists() else {}
+    known_unavailable = {item["task"]: item for item in previous_state.get("unavailable_details", [])
+                         if isinstance(item, dict) and isinstance(item.get("task"), str)}
+    # Migrate failures written by older importer versions. Permanent 404s can
+    # be skipped forever; the unusually large vote responses get another
+    # attempt after a cooling-off period.
+    retry_after = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    for item in previous_state.get("errors", []):
+        if not isinstance(item, dict) or not isinstance(item.get("task"), str):
+            continue
+        error = item.get("error", "")
+        if error.startswith("HTTP 404:"):
+            known_unavailable[item["task"]] = {**item, "permanent": True}
+        elif item["task"].startswith("('votes/") and "timed out" in error.lower():
+            known_unavailable[item["task"]] = {**item, "retry_after": retry_after}
     # Refresh listing pages once per cycle, then resume that cycle from cache.
     refresh_pages = refresh and previous_state.get("status") == "complete"
     state["cycle_started_at"] = utc_now() if refresh_pages else previous_state.get("cycle_started_at", utc_now())
@@ -374,7 +398,35 @@ def import_archive(archive, languages=LANGUAGES, workers=4, interval=0.2, max_re
 
     def detail(task):
         resource, language, identifier = task
-        payload = client.fetch(f"{resource}/{identifier}", language, source_updated=detail_tasks[task])
+        task_key = str(task)
+        known = known_unavailable.get(task_key)
+        if known and (known.get("permanent") is True or known.get("retry_after", "") > utc_now()):
+            with state_lock:
+                state["unavailable_details"].append(known)
+                state["details"][f"{language}/{resource}"]["unavailable"] += 1
+            return
+        try:
+            payload = client.fetch(f"{resource}/{identifier}", language, source_updated=detail_tasks[task])
+        except NotFound as error:
+            # Some historic list rows in the legacy API point to detail routes
+            # that no longer exist. Retrying those permanent gaps makes every
+            # resumed import fail without adding data.
+            with state_lock:
+                state["unavailable_details"].append({"task": task_key, "error": str(error), "permanent": True})
+                state["details"][f"{language}/{resource}"]["unavailable"] += 1
+            return
+        except RequestTimedOut as error:
+            if not resource.startswith("votes/"):
+                raise
+            # A small set of very large legacy vote responses regularly takes
+            # longer than the service and runner allow, even after all retries.
+            # Quarantine them temporarily instead of retrying for hours nightly.
+            unavailable = {"task": task_key, "error": str(error),
+                           "retry_after": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()}
+            with state_lock:
+                state["unavailable_details"].append(unavailable)
+                state["details"][f"{language}/{resource}"]["unavailable"] += 1
+            return
         require(isinstance(payload, dict), f"detail response is not an object: {resource}/{identifier}")
         require(payload.get("id") == identifier, f"detail ID mismatch: {resource}/{identifier}")
         with state_lock:
@@ -417,7 +469,7 @@ def import_archive(archive, languages=LANGUAGES, workers=4, interval=0.2, max_re
                 run_jobs(pool, [(resource, lang) for resource in resources for lang in languages], lambda task: listing(*task))
                 for resource, language, _ in detail_tasks:
                     key = f"{language}/{resource}"
-                    state["details"].setdefault(key, {"total": 0, "completed": 0})["total"] += 1
+                    state["details"].setdefault(key, {"total": 0, "completed": 0, "unavailable": 0})["total"] += 1
                 save()
                 order = {resource.detail_path: index for index, resource in enumerate(resources) if resource.detail_path}
                 tasks = sorted(detail_tasks, key=lambda task: (order[task[0]], task[2], languages.index(task[1])))

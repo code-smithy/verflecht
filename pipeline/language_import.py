@@ -91,9 +91,11 @@ def main():
         print("| Collection | Records | Complete |\n| --- | ---: | --- |")
         for name, item in report["collections"].items():
             print(f"| {name} | {item['records']} | {item['complete']} |")
-        print("\n| Details | Imported | Discovered |\n| --- | ---: | ---: |")
+        print("\n| Details | Imported | Unavailable | Discovered |\n| --- | ---: | ---: | ---: |")
         for name, item in report["details"].items():
-            print(f"| {name} | {item['completed']} | {item['total']} |")
+            print(f"| {name} | {item['completed']} | {item.get('unavailable', 0)} | {item['total']} |")
+        if report.get("unavailable_details"):
+            print(f"\n{len(report['unavailable_details'])} legacy detail records were unavailable; timed-out vote records are retried after their cooling-off period.")
         for error in report["errors"]:
             print(f"\n- {error}")
     else:
