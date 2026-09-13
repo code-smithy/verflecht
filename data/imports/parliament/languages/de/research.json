@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "storage": "json-parts-v1",
+  "parts": {
+    "sources": [
+      "research.parts/53ec4eabb69eeb02a9ce7934517ae290e3175752071e2f0ed2d1f4595efe47fb.json"
+    ],
+    "documents": [
+      "research.parts/94692890ff671f00170d4f685201a07be6f2043e1d517b43b412c2cefbe197c3.json",
+      "research.parts/5add9bec989808c9b24c95ea2e4b244c4f683dc5efcab868a1fe552b9f8c6a44.json",
+      "research.parts/f9348a9e182fa6439f8b4f6da4fcd09b0fcf1438b60c58cc20df96b9d50fd1f7.json",
+      "research.parts/3b03924ae55920144e7477d63d7e64f3b347216c89ad66ccd5f4d593e7939439.json",
+      "research.parts/ab1a4a8a99cb09ac238ee887b9b74247e89289743f34c2cdd4dd1308708dd8c1.json",
+      "research.parts/5fbe57a82c14b24da1704b3a6966ff32ccae3161f2afde9dfc248393448e4bca.json",
+      "research.parts/ae5aa73ba4f0fe478b7386066c5141efc1a528318c27b4bde20398a9c1df9c42.json"
+    ],
+    "entities": [
+      "research.parts/0e2e6fe4b74a9adb02e74bfc98886d21aa30df1dd95f382b45e304447b665cea.json"
+    ],
+    "claims": [
+      "research.parts/4cb615d9c83608cf9f2526dddc927bb58b7064fb69da4564e468afadf4395807.json",
+      "research.parts/cd1fbd6b16bee2c68a1383cd815f9cf7d388be38d15648b6e3501aec13d334d8.json",
+      "research.parts/4bd1c9528ae22cf3e7a24e0b914235a83af3332b44d3a80c528223c068fc44f4.json",
+      "research.parts/c326f4fa2aecd4d21d2e0566b45221e5757e9fcc05366621e8684e435fd99464.json",
+      "research.parts/c45bdbf65b4019b953f4c95b23e16286ca7ceab36829b9820f93feaa920ee464.json",
+      "research.parts/1fa282246c2be321f1bf94c982068b8f879fcc60e278c9c3911d4c207bd03c8c.json",
+      "research.parts/0b4285c471d9024e5fdb0556c6378783a2c86cd68eb8701a226eaf20d28e712e.json",
+      "research.parts/22ab5795cf249938b86b20411b5bee6abe2748eb854ad7e4d97533c67ae0a187.json",
+      "research.parts/8dc0e64f40e7780ce1cbcca74744b5e546dc990a82578b031cc764d70988064d.json",
+      "research.parts/7920430da1271e5ab8a59cdca95f5e876c539404f21a705d29c7a3d0dbe26b88.json",
+      "research.parts/6a3e51de647fcf786f20e11c686a2a1bbf5067bdfe8da360bd997972c6f3adef.json",
+      "research.parts/fd2a51db2c9f0fe6582d6a22060ba1fb6b17049f16583d1cbae9b859bc911b90.json",
+      "research.parts/38d164bda23b2ebc398da32cc92139f3e81b4366d92fd9920081d53e221e84ac.json",
+      "research.parts/0e1b349c8dacae4bc63bb5f89b93b5452ad4ec953c2763c28a7340208570769c.json",
+      "research.parts/7655d87e2f50d5e4e0296477fe0f39ad36fc8259c6cb89838abd196363493691.json",
+      "research.parts/c484c8bc8c5d2051108b7a5c57d3d57daae0191102e2fc6fdbbdb251cf81c530.json",
+      "research.parts/8ccb0b9d5a3d26d2e807ce78644a653f4e2e36951a7224a78ab08025e26cf0c7.json"
+    ]
+  }
+}
