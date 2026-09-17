@@ -39,6 +39,7 @@ jobs:
           IMPORT_LANGUAGE: ${{ inputs.language || 'all' }}
           IMPORT_MAX_SECONDS: ${{ github.event_name == 'schedule' && '14400' || format('{0}', inputs.max_seconds) }}
         run: |
+          python build_data_pipeline.py
           python -m unittest discover -s tests/pipeline -v
           python -m pipeline.language_import config >> "$GITHUB_OUTPUT"
 
