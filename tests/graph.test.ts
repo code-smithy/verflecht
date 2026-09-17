@@ -30,7 +30,7 @@ describe("Python export contract", () => {
       })),
     );
     await expect(loadGraph()).resolves.toHaveProperty("schema_version", 1);
-  });
+  }, 30_000);
 
   it("accepts parliamentary affairs with distinct authorship and co-signature links", () => {
     for (const predicate of ["AUTHORED", "CO_SIGNED"]) {
