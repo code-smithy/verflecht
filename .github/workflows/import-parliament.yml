@@ -39,7 +39,6 @@ jobs:
           IMPORT_LANGUAGE: ${{ inputs.language || 'all' }}
           IMPORT_MAX_SECONDS: ${{ github.event_name == 'schedule' && '14400' || format('{0}', inputs.max_seconds) }}
         run: |
-          python build_data_pipeline.py
           python -m unittest discover -s tests/pipeline -v
           python -m pipeline.language_import config >> "$GITHUB_OUTPUT"
 
@@ -139,7 +138,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/imports/parliament public/data/graph.json public/data/graph.parts
+          git add data/imports/parliament
           if ! git diff --cached --quiet; then
             git commit -m "Update normalized Parliament language snapshots"
             git push origin HEAD:main
