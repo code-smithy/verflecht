@@ -6,6 +6,7 @@ out/
 pnpm-lock.yaml
 data/raw/
 data/imports/
+public/data/graph.json
 public/data/graph.parts/
 
 # Preserve authored planning docs unless they are intentionally edited.

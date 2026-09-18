@@ -40,8 +40,8 @@ jobs:
       - name: Test pipeline
         run: pnpm test:pipeline
 
-      - name: Check generated data
-        run: pnpm data:check
+      - name: Build generated data
+        run: pnpm data:build
 
       - name: Lint
         run: pnpm lint

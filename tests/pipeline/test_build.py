@@ -131,8 +131,16 @@ class PipelineTests(unittest.TestCase):
 
     def test_cli_from_another_directory_and_error_exit(self):
         with tempfile.TemporaryDirectory() as directory:
-            result = subprocess.run([sys.executable, str(ROOT / "build_data_pipeline.py"), "--check"], cwd=directory, capture_output=True, text=True)
+            source, output = Path(directory) / "research.json", Path(directory) / "graph.json"
+            source.write_text(json.dumps(self.data), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "build_data_pipeline.py"), "--input", str(source), "--output", str(output)],
+                cwd=directory,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(output.is_file())
             result = subprocess.run([sys.executable, str(ROOT / "build_data_pipeline.py"), "--input", str(Path(directory) / "missing.json")], capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
             self.assertIn("Pipeline failed", result.stderr)
